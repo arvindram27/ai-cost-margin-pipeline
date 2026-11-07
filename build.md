@@ -48,3 +48,20 @@ Rules:
 - State after this entry: not started
 - Blockers: Phase 0 has no approved scope yet.
 - Next step: await the Phase 0 scoped brief. Repo creation, remote creation and visibility, dependency installs, and the first commit/push each need their own reviewed approval first; the roadmap alone approves none of them.
+
+---
+
+### Entry 1 - 2026-11-07 14:40 IST
+
+- Phase: 0 - Repo and environment foundation
+- Tool/model: DeepSeek Harness (deepseek-flash)
+- Verified base (last commit verified by review): none (repo bootstrap)
+- HEAD at work start (may include unverified commits; a dirty mid-phase HEAD is not a verified base): none (0 commits)
+- What changed: Phase 0 scaffold committed on main in C1-C3 - repo hygiene (.gitattributes, .gitignore), pinned requirements.txt, pytest configuration and the empty package, project brief and roadmap under docs/, build log starter, smoke test and README. Then a clean clone was installed and tested to prove the committed tree is runnable from a fresh checkout.
+- Tests run (command -> short result summary, author-reported until review): `py -3.13 -m venv .venv` -> exit 0 in the original repo and in the clean clone. `pip install --only-binary :all: -r requirements.txt` -> exit 0, 40 distributions, wheels only, in both environments. `python -m pytest` -> 5 passed, 0 failed, exit 0 in the original venv (0.47s) and in the clean clone (0.50s). `pip list --format=freeze` compared live between the two venvs -> identical, 41 name==version entries each. All results are author-reported; none has been independently verified by review. The clean-clone run is a second local environment check on this machine, not an external verification.
+- Provenance/data notes (which fixtures or inputs were touched): no fixtures and no provider data. This phase touched dependency resolution and an in-memory DuckDB decimal check only; project code made no network or provider calls.
+- Commits produced (hashes pasted from `git log`): 96cf338 (C1, scaffold, ignore rules and pinned dependencies), 0dafff8 (C2, project brief, roadmap and build log starter), 0ec1eaa (C3, smoke test and README).
+- Log commit (hash of the commit that added the PREVIOUS entry): 0dafff8 (C2 added Entry 0).
+- State after this entry: in progress
+- Blockers: none
+- Next step: await the push gate approval
