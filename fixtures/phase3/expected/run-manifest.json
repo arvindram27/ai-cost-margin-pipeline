@@ -1,0 +1,57 @@
+{
+  "aggregation_definition_id": "customer-workload-margin/v1",
+  "artifact_schema_version": "1.0",
+  "as_of_cutoff": "2026-11-01T23:59:59Z",
+  "code_version": "fixtures-phase3-golden-v1",
+  "code_version_source": "fixture",
+  "digest": "39240f3cdd813b7cd7ac67a421a303bc47cf4268ca390b51e81a03ebfe52edf0",
+  "digest_definition": "ai-cost-margin/margin-digest/v1",
+  "dirty_status_sha256": null,
+  "inputs": {
+    "events_excluded_by_cutoff": 0,
+    "events_in_store": 19,
+    "events_included": 19,
+    "plans_file": "customer-plans-simulated-v1.json",
+    "plans_label": "simulated",
+    "plans_sha256": "5136133120cf60cbf1376185f20f2b9e7ec3fd2aebcd30b51b3f35e79a8ee6cf",
+    "plans_version_id": "simulated-plans-v1",
+    "price_list_file": "price-list-synthetic-v1.json",
+    "price_list_id": "synthetic-prices-v1",
+    "price_list_sha256": "6d30ff0a6a8fde2886d4502549414c0d795c4f049e11c2343546831aa9314ee6",
+    "store_events_file": "events.jsonl",
+    "store_events_sha256": "5e020d781e3b107e2a45c7fe208aadaf3b4c30a79bc11daf710142c5bdc40556"
+  },
+  "labels": {
+    "cost": "estimated",
+    "margin": "simulated",
+    "revenue": "simulated",
+    "usage": "synthetic"
+  },
+  "periods": [
+    "2026-10"
+  ],
+  "run_fingerprint": "74830d359380622866febeefceb5b8e8d060014beb0a7f119dc42c6e9dc079f4",
+  "tables": {
+    "customer_margins": {
+      "file": "customer-margins.jsonl",
+      "rows": 6,
+      "sha256": "a7d521a4cb6083f1b30ba63f26da5748f44ed59887b44423d7a087d78d8a0733"
+    },
+    "lineage": {
+      "file": "lineage.jsonl",
+      "rows": 2,
+      "sha256": "b83fd63a6c5dbef12387a1cedf45a7c59586fe64bd4fce0bdd52d6b2f88ccb1f"
+    },
+    "unallocated": {
+      "file": "unallocated.jsonl",
+      "rows": 1,
+      "sha256": "afb7806ec58fcbf93f0eee556d306df4072665b699309aca3e5ece895097e01d"
+    },
+    "workload_margins": {
+      "file": "workload-margins.jsonl",
+      "rows": 15,
+      "sha256": "0b1042b9f220fdfda43b0123e065d100314496993decb123ee138420fd03c98d"
+    }
+  },
+  "working_tree_clean": null
+}

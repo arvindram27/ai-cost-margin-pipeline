@@ -1,0 +1,22 @@
+{
+  "currency": "USD",
+  "entries": [
+    {
+      "customer_id": "cust-001",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": "2026-10-16T00:00:00Z",
+      "monthly_price": "49.000000000000",
+      "plan_id": "starter"
+    },
+    {
+      "customer_id": "cust-001",
+      "effective_from": "2026-10-17T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "59.000000000000",
+      "plan_id": "starter-plus"
+    }
+  ],
+  "label": "simulated",
+  "plans_version_id": "invalid-plans-gap",
+  "timezone": "UTC"
+}
