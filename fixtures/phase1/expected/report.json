@@ -1,0 +1,134 @@
+{
+  "files": [
+    {
+      "content_sha256": "e08539da59bbf0e71016a4337a3dbe9b7503aadc85b144773f47e88ea28a780b",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 0,
+        "duplicates": 0,
+        "inserted": 12,
+        "quarantined": 0,
+        "received": 12,
+        "validated": 12
+      },
+      "file_name": "batch-001-clean.json",
+      "reason": null,
+      "status": "applied"
+    },
+    {
+      "content_sha256": "f4a79fa6f646b799268a5bf219f581906ce8535cb1db84cf81fb75ced157b117",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 0,
+        "duplicates": 1,
+        "inserted": 2,
+        "quarantined": 0,
+        "received": 3,
+        "validated": 3
+      },
+      "file_name": "batch-002-retries.json",
+      "reason": null,
+      "status": "applied"
+    },
+    {
+      "content_sha256": "1daf12f0f01b0123ac27d49e69f778c8b4695c086a302521841c8723689c8b53",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 0,
+        "duplicates": 0,
+        "inserted": 0,
+        "quarantined": 2,
+        "received": 2,
+        "validated": 2
+      },
+      "file_name": "batch-003-changed-payload.json",
+      "reason": null,
+      "status": "applied"
+    },
+    {
+      "content_sha256": "2a7ff939a046b9fe1d7116c27c965ed9d5f19fcfa23b5f36f1a75f590b89a505",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 0,
+        "duplicates": 0,
+        "inserted": 2,
+        "quarantined": 0,
+        "received": 2,
+        "validated": 2
+      },
+      "file_name": "batch-004-correction.json",
+      "reason": null,
+      "status": "applied"
+    },
+    {
+      "content_sha256": "04e53feeaecfb6b272b4daa8ba358862c04e9931c34eb18284f8a69f8029b80a",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 9,
+        "duplicates": 0,
+        "inserted": 0,
+        "quarantined": 0,
+        "received": 9,
+        "validated": 0
+      },
+      "file_name": "batch-005-malformed.json",
+      "reason": null,
+      "status": "applied"
+    },
+    {
+      "content_sha256": "5ebf326953b5c20b6d6d8f27fc0e9ccc468dac7ca4a49e2d5b44548768232a81",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 0,
+        "duplicates": 0,
+        "inserted": 3,
+        "quarantined": 0,
+        "received": 3,
+        "validated": 3
+      },
+      "file_name": "batch-006-unavailable-fields.json",
+      "reason": null,
+      "status": "applied"
+    },
+    {
+      "content_sha256": "5c639766463ef6f76c81ef744452bfa446a0a30bc8ba7c9025207e5dbb1d1b9f",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 1,
+        "duplicates": 0,
+        "inserted": 0,
+        "quarantined": 0,
+        "received": 0,
+        "validated": 0
+      },
+      "file_name": "batch-007-invalid-json.json",
+      "reason": "invalid_json",
+      "status": "failed"
+    },
+    {
+      "content_sha256": "e08539da59bbf0e71016a4337a3dbe9b7503aadc85b144773f47e88ea28a780b",
+      "counts": {
+        "dangling_supersedes": 0,
+        "dead_lettered": 0,
+        "duplicates": 0,
+        "inserted": 0,
+        "quarantined": 0,
+        "received": 0,
+        "validated": 0
+      },
+      "file_name": "batch-001-clean.json",
+      "reason": null,
+      "status": "duplicate_file_ignored"
+    }
+  ],
+  "ingest_id": "sha256:4132d097bd02035022cca4cdee36e3e07f5940e29ea316eb34524f32d850cb46",
+  "totals": {
+    "dangling_supersedes": 0,
+    "dead_lettered": 10,
+    "duplicates": 1,
+    "inserted": 19,
+    "quarantined": 2,
+    "received": 31,
+    "validated": 22
+  }
+}

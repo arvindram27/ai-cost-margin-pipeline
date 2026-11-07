@@ -5,9 +5,11 @@ cost to serve, what did the customer pay, and is the price sustainable?* The end
 product is a hosted, interactive Streamlit demo; this repo is at the start of that
 build.
 
-**Status: Phase 0 - empty but runnable skeleton.** There is no pipeline, no app, no
-data, no export and no deployment yet. The only thing proven so far is that a clean
-checkout installs the pinned dependencies and the package imports.
+**Status: Phase 1 - ingestion foundation.** Synthetic fixture batches are validated
+against a versioned event contract, deduplicated on a stable event key, quarantined
+when a payload changes without a version or correction reference, and recorded in a
+content-hashed manifest alongside a dead-letter and a quarantine path. There is no
+pricing, no aggregation, no app, no export and no deployment yet.
 
 The target is a **production-oriented demo**, not a production-validated system:
 there is no multi-user access control, no security review, no SLA and no real
@@ -46,17 +48,39 @@ Notes:
 - `--only-binary :all:` fails fast when a wheel is missing, rather than trying to
   build from source.
 
+## Local commands (Phase 1)
+
+The package uses a `src/` layout, so module commands need `src` on `PYTHONPATH`
+(`pytest.ini` sets that for pytest only). From the repo root:
+
+```powershell
+$env:PYTHONPATH = "$PWD\src"
+
+# regenerate the committed fixtures (must reproduce them byte for byte)
+.venv\Scripts\python.exe -m ai_cost_margin.fixtures --out fixtures\phase1
+
+# ingest the fixture batches into the private store
+.venv\Scripts\python.exe -m ai_cost_margin.ingest --home var --dir fixtures\phase1
+
+# the suite, including the golden ingestion check
+.venv\Scripts\python.exe -m pytest
+```
+
+`--dir` is non-recursive: only top-level `*.json` files are delivered, so
+`fixtures/phase1/expected/` is never ingested. The rules the ingestion code enforces
+are written down in [the ingestion contract](docs/phase-1-ingestion-contract.md).
+
 ## Layout
 
 ```text
 ai-cost-margin-pipeline/
   app/                  Streamlit app (Phase 5; placeholder only today)
   docs/                 project brief and implementation roadmap
-  fixtures/             synthetic input fixtures (Phase 1; placeholder only today)
+  fixtures/phase1/      synthetic batch fixtures and their frozen expected outputs
   src/ai_cost_margin/   shared pipeline package
   tests/                pytest suite
-  var/                  private working state - raw events, run history, DuckDB files
-                        (gitignored; not created yet)
+  var/                  private working state, gitignored: raw file copies, events,
+                        manifest, dead-letter, quarantine and the last run report
 ```
 
 ## Data rules
@@ -82,9 +106,11 @@ Every number the pipeline produces is labelled **actual**, **estimated** or
 
 - [Project brief](docs/ai-cost-margin-pipeline-brief.md)
 - [Implementation roadmap](docs/ai-unit-economics-implementation-roadmap.md)
+- [Phase 1 ingestion contract](docs/phase-1-ingestion-contract.md)
 - [Build log](build.md) - append-only record of progress and evidence
 
 ## Not present yet
 
-No pipeline, no schema, no fixtures, no costing, no aggregation, no export, no
-Streamlit app, no tests beyond the smoke test, no CI, no deployment, no license yet.
+No pricing, no aggregation, no margins, no export, no Streamlit app, no hosted
+deployment, no CI, no license yet. Ingestion runs on synthetic fixtures only: the
+durable DuckDB store, staged checkpoints and crash recovery arrive in Phase 4.
