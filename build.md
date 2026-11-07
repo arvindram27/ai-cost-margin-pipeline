@@ -99,3 +99,20 @@ Rules:
 - State after this entry: in progress
 - Blockers: none
 - Next step: await the push gate approval
+
+---
+
+### Entry 4 - 2026-11-07 21:55 IST
+
+- Phase: 3 - Aggregation, margins and run provenance (M3)
+- Tool/model: OpenCode (model not recorded)
+- Verified base (last commit verified by review): e455738f4f7b887fbf54ac691b9b6ebca4f3bf1c (verified by the Phase 2 closeout review)
+- HEAD at work start (may include unverified commits; a dirty mid-phase HEAD is not a verified base): e455738f4f7b887fbf54ac691b9b6ebca4f3bf1c at phase start
+- What changed: C1 added usage aggregation per customer and workload type with an explicit unallocated bucket. C2 added run versioning, corrections lineage and code-version provenance, with late-arrival and late-correction fixtures. C3 added the simulated plan model with invalid-plan fixtures, the margin tables, the canonical digest and the golden expected outputs. C4 added the hand-calculation script, the margin contract document, the README test-count wording correction and re-rendered architecture and workflow diagrams showing M3 as built. Review caught a bare test count in the architecture diagram legend; the legend was corrected and re-rendered before commit. During placement of the four reviewed diagram files, a copy step was paired with an exit-code check that does not apply to that command; the check raised and the run continued instead of stopping for review. All four transferred files were hash-verified immediately afterwards and matched exactly; future command errors stop for review.
+- Tests run (command -> short result summary, author-reported until review): original venv `python -m pytest` -> 248 passed, 1 skipped (the explicit golden-generation check), exit 0. The replay and hand-calculation comparisons are author-reported from the same local run; the suite was not re-run independently. Independent review of the exact pushed commit verified: every source file byte against the reviewed bundle and the published base; the golden margin digest recomputed byte-exact; allocation sums and the revenue and allocation rules against the margin contract; each commit's tree hash against independently computed trees from the reviewed bytes; the published file bytes on the remote; and the rendered README, diagrams and repository metadata on the published page. The original work-start working-tree byte map was not recoverable from the session record, so byte preservation during the build window is not claimed; the review verified the final bytes against the reviewed bundle and the published base.
+- Provenance/data notes (which fixtures or inputs were touched): synthetic customer plans, synthetic late-arrival and late-correction batches, invalid plan fixtures and golden expected outputs only; no real customer data, no real provider rates and no live calls. Golden fixtures pin the fixed fixture code-version label fixtures-phase3-golden-v1; the production CLI always probes code version from git. Revenue is labelled simulated and every cost is labelled estimated; the working store stays under var/ and is gitignored.
+- Commits produced (hashes pasted from `git log`): c9e90b01466542728e9036964660dffff758d678 (C1, aggregation and unallocated bucket), 88ddbe2825cc1ffa23aff0250e9446ef9eef9a07 (C2, run versioning, lineage and code-version provenance), b220443384eac4743b417311d2df582f2a650d8e (C3, margin tables, digest and golden fixtures), e3096562ff6d4bbc74cfef48ca0e52a0d0d97835 (C4, hand-calculation, contract, README and diagram updates)
+- Log commit (hash of the commit that added the PREVIOUS entry): 7dfd531aa223936bbe62f8e762efd5cf62a13351 (the commit carrying Entry 3)
+- State after this entry: verified at e3096562ff6d4bbc74cfef48ca0e52a0d0d97835
+- Blockers: none
+- Next step: Phase 4 planning (M4: DuckDB store, atomic publish, crash recovery) in Plan mode.
