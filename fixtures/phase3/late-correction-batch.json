@@ -1,0 +1,26 @@
+{
+  "account_id": "acct-demo",
+  "arrival_time": "2026-11-15T00:00:00Z",
+  "batch_id": "phase3-late-correction",
+  "events": [
+    {
+      "attempt_id": "1",
+      "customer_id": "cust-001",
+      "feature": "demo-assistant",
+      "model": "synth-small",
+      "provider_event_id": "evt-p3-correction-001",
+      "record_version": 1,
+      "request_id": "req-001-007",
+      "schema_version": "1.0",
+      "supersedes": "evt-001-007",
+      "tokens_cached": 10,
+      "tokens_input": 900,
+      "tokens_output": 600,
+      "unavailable_fields": [],
+      "usage_time": "2026-10-13T14:42:00Z",
+      "workload_type": "spiky"
+    }
+  ],
+  "provider": "synthetic-token-provider",
+  "schema_version": "1.0"
+}
