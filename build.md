@@ -65,3 +65,20 @@ Rules:
 - State after this entry: in progress
 - Blockers: none
 - Next step: await the push gate approval
+
+---
+
+### Entry 2 - 2026-11-07 15:36 IST
+
+- Phase: 1 - Schema, fixtures and ingestion foundation
+- Tool/model: DeepSeek Harness (deepseek-flash)
+- Verified base (last commit verified by review): ef1a153 (Phase 0 log commit; no Phase 1 commit is review-verified yet)
+- HEAD at work start (may include unverified commits; a dirty mid-phase HEAD is not a verified base): ef1a153 at phase start; c9b9fca (P1-C3) at the start of the remediation gate
+- What changed: Phase 1 built the ingestion foundation on synthetic fixtures only. C1 to C3 added the versioned event contract with an explicit unavailable-field marker, the seeded fixture generator and its seven committed fixture files, ingestion with a content-hashed manifest, dead-letter and quarantine, the ingestion contract document, the test suite with frozen golden outputs, and the README update. The first clean-clone check failed at the clone pytest step (2 of 55 tests, byte comparisons, CRLF versus LF on checkout) and nothing was fixed in that run. Remediation was a one-line .gitattributes change, `* text=auto` to `* text=auto eol=lf` (C4), so checkout is LF regardless of a client's git settings; a second clean-clone check then passed every step.
+- Tests run (command -> short result summary, author-reported until review): original venv `python -m pytest` -> 55 passed, exit 0. First clean clone `python -m pytest` -> 2 failed, 53 passed, exit 1 (CRLF versus LF byte comparisons; no fix applied in that run). Second clean clone: `pip install --only-binary :all: -r requirements.txt` -> exit 0; `pip freeze` identical between the two venvs (40 entries each, 0 differences, all three direct pins exact); LF checkout proof -> 23 of 23 reviewed files matched; `python -m pytest` -> 55 passed, exit 0; fixture regeneration -> 7 of 7 matched; golden ingest -> 5 of 5 outputs matched. All results are author-reported and not independently verified by review; the clean-clone runs are second local environments on one machine, not external verification. An initial test assertion was corrected before review; future failed checks stop for review, with no cleanup.
+- Provenance/data notes (which fixtures or inputs were touched): synthetic fixtures only; no provider, customer or invoice data and no live calls. The private store stays under var/ and is gitignored, and the seeded generator reproduces every committed fixture byte for byte.
+- Commits produced (hashes pasted from `git log`): f8a3667018f292acb179ac1e76aa3c064fbfcb78 (C1, event schema, fixture generator and committed fixtures), a99c9cf8b89e6491710076909c2f132fa85cc2e8 (C2, ingestion with manifest, dead-letter and quarantine), c9b9fca0ab1702f34059ff89b3178abefca787f4 (C3, ingestion tests and golden outputs), 4e99fde2f6a19688ee2f04b229b01d96f0a3c281 (C4, enforce LF checkout in .gitattributes)
+- Log commit (hash of the commit that added the PREVIOUS entry): ef1a15351fc8d2e40d048cb47455a3b2ee23f573 (the commit carrying Entry 1)
+- State after this entry: in progress
+- Blockers: none
+- Next step: await the push gate approval
