@@ -1,0 +1,2 @@
+{"arrival_time":"2026-11-01T00:00:00Z","rule":"record_version","status":"resolved","superseded_event_key":"evt-0003","superseded_record_version":1,"superseding_event_key":"evt-0003","superseding_record_version":2,"usage_time":"2026-10-05T10:14:00Z"}
+{"arrival_time":"2026-11-01T00:00:00Z","rule":"supersedes","status":"resolved","superseded_event_key":"evt-0005","superseded_record_version":1,"superseding_event_key":"evt-0015","superseding_record_version":1,"usage_time":"2026-10-09T12:28:00Z"}

@@ -1,0 +1,51 @@
+{
+  "currency": "USD",
+  "entries": [
+    {
+      "customer_id": "cust-001",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "49.000000000000",
+      "plan_id": "starter"
+    },
+    {
+      "customer_id": "cust-002",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "99.000000000000",
+      "plan_id": "growth"
+    },
+    {
+      "customer_id": "cust-003",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "99.000000000000",
+      "plan_id": "growth"
+    },
+    {
+      "customer_id": "cust-004",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "49.000000000000",
+      "plan_id": "starter"
+    },
+    {
+      "customer_id": "cust-005",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "199.000000000000",
+      "plan_id": "scale"
+    },
+    {
+      "customer_id": "cust-006",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "monthly_price": "99.000000000000",
+      "plan_id": "growth"
+    }
+  ],
+  "label": "simulated",
+  "notes": "Synthetic customer plans and simulated flat monthly revenue. These are not real customers, prices, or income.",
+  "plans_version_id": "simulated-plans-v1",
+  "timezone": "UTC"
+}

@@ -1,0 +1,77 @@
+{
+  "export_integrity_definition": "ai-cost-margin/export-integrity/v1",
+  "export_integrity_digest": "9bf47ddd2f99f74098cf822a6571d7cb1528183f6fc10af1914b6c0018ad8976",
+  "export_schema_version": "1.0",
+  "files": {
+    "customer-margins.jsonl": {
+      "rows": 6,
+      "sha256": "a7d521a4cb6083f1b30ba63f26da5748f44ed59887b44423d7a087d78d8a0733"
+    },
+    "lineage.jsonl": {
+      "rows": 2,
+      "sha256": "daef19129c38bb7e56715ca4a9db22460c7a1652369c98b89f2777bea36ba70f"
+    },
+    "plans.json": {
+      "rows": 6,
+      "sha256": "5136133120cf60cbf1376185f20f2b9e7ec3fd2aebcd30b51b3f35e79a8ee6cf"
+    },
+    "price-list.json": {
+      "rows": 4,
+      "sha256": "6d30ff0a6a8fde2886d4502549414c0d795c4f049e11c2343546831aa9314ee6"
+    },
+    "scenario-events.jsonl": {
+      "rows": 19,
+      "sha256": "5ecb2f7d0674ba9813a2caf4d37c224d36da435962282af6c7180927b41150d5"
+    },
+    "unallocated.jsonl": {
+      "rows": 1,
+      "sha256": "afb7806ec58fcbf93f0eee556d306df4072665b699309aca3e5ece895097e01d"
+    },
+    "workload-margins.jsonl": {
+      "rows": 15,
+      "sha256": "0b1042b9f220fdfda43b0123e065d100314496993decb123ee138420fd03c98d"
+    }
+  },
+  "labels": {
+    "cost": "estimated",
+    "margin": "simulated",
+    "revenue": "simulated",
+    "usage": "synthetic"
+  },
+  "source": {
+    "artifact_dir": "f9b353ae06750eb64af10c4b3e077b46815afe07f906015f2ffd79ac7e1f795f",
+    "as_of_cutoff": "2026-11-01T23:59:59Z",
+    "code_version": "99ea22b554b4fa1785519d1c3d40514317688488",
+    "code_version_source": "git_head",
+    "dangling_supersedes": 0,
+    "dead_lettered": 1,
+    "digest": "39240f3cdd813b7cd7ac67a421a303bc47cf4268ca390b51e81a03ebfe52edf0",
+    "digest_definition": "ai-cost-margin/margin-digest/v1",
+    "dirty_status_sha256": "edeeb8d4662d573ec9c1c5d58ed2b03c49492f19cdf61545444018923950b5d1",
+    "duplicates": 0,
+    "events_costed": 15,
+    "events_excluded_by_cutoff": 0,
+    "events_in_store": 19,
+    "events_included": 19,
+    "events_superseded": 2,
+    "events_unpriced": 2,
+    "plans_sha256": "5136133120cf60cbf1376185f20f2b9e7ec3fd2aebcd30b51b3f35e79a8ee6cf",
+    "plans_version_id": "simulated-plans-v1",
+    "price_list_id": "synthetic-prices-v1",
+    "price_list_sha256": "6d30ff0a6a8fde2886d4502549414c0d795c4f049e11c2343546831aa9314ee6",
+    "quarantined": 0,
+    "run_fingerprint": "f9b353ae06750eb64af10c4b3e077b46815afe07f906015f2ffd79ac7e1f795f",
+    "store_backend": "duckdb",
+    "store_events_sha256": "bc9c0f30932aa302cef47a1a4725f792848be726d2be4cdbbd23d653d6a8175f",
+    "store_locator": "pipeline.duckdb",
+    "unallocated_cost_share_bp": 968,
+    "unallocated_event_share_bp": 667,
+    "unpriced_by_reason": {
+      "inconsistent_token_counts": 0,
+      "model_not_in_price_list": 0,
+      "no_applicable_rate": 0,
+      "token_count_unavailable": 2
+    },
+    "working_tree_clean": false
+  }
+}
