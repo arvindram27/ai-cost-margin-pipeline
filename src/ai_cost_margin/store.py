@@ -135,11 +135,29 @@ class Store:
         return self.state_dir / "last-ingest-report.json"
 
     def write_raw(self, digest: str, data: bytes) -> None:
-        """Keep a content-addressed copy of a delivered file (idempotent)."""
+        """Keep or verify a content-addressed copy of a delivered file.
+
+        Existing bytes are never overwritten. If a raw copy is already present,
+        its content hash must equal its name; a mismatch is a typed store error
+        (Phase 4 amendment A4, point 1: an orphan raw copy stays self-verifying
+        evidence instead of being repaired or replaced).
+        """
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         target = self.raw_dir / f"{digest}.json"
-        if not target.exists():
+        if target.exists():
+            try:
+                existing = target.read_bytes()
+            except OSError as exc:
+                raise StoreError(f"cannot read raw copy {target.name}: {exc}") from exc
+            if content_sha256(existing) != digest:
+                raise StoreError(
+                    f"raw copy {target.name} does not match its content hash; refusing to overwrite"
+                )
+            return
+        try:
             target.write_bytes(data)
+        except OSError as exc:
+            raise StoreError(f"cannot write raw copy {target.name}: {exc}") from exc
 
     def write_report(self, report: dict[str, Any]) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)

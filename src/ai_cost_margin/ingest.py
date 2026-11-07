@@ -34,14 +34,8 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .schema import validate_envelope, validate_event
-from .store import (
-    Store,
-    StoreError,
-    append_jsonl,
-    content_sha256,
-    payload_sha256,
-    read_jsonl,
-)
+from .store import StoreError, content_sha256, payload_sha256
+from .store_adapter import StoreAdapter, default_adapter
 
 __all__ = ["COUNT_KEYS", "FileOutcome", "IngestError", "IngestReport", "ingest", "main"]
 
@@ -183,10 +177,20 @@ def _quarantine_row(
     }
 
 
-def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
-    """Ingest ``paths`` (in delivery order) into the store rooted at ``home``."""
+def ingest(
+    paths: Sequence[Path],
+    home: Path | str,
+    adapter: StoreAdapter | None = None,
+) -> IngestReport:
+    """Ingest ``paths`` (in delivery order) into the store rooted at ``home``.
+
+    ``adapter`` is the Phase 4 (A6) seam. When it is ``None`` the default JSONL
+    adapter is used, so the Phase 1 CLI and every existing test keep the exact
+    previous behaviour. The adapter only reads dedup state and appends rows;
+    validation and dedup stay here, exactly once.
+    """
     home_path = Path(home)
-    store = Store(home_path)
+    store_adapter: StoreAdapter = default_adapter(home_path) if adapter is None else adapter
 
     deliveries: list[tuple[Path, bytes, str]] = []
     for raw_path in paths:
@@ -204,10 +208,10 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
         "\n".join(digest for _, _, digest in deliveries).encode("utf-8")
     )
 
-    existing_events = read_jsonl(store.events_path)
-    manifest = read_jsonl(store.manifest_path)
-    dead_letter = read_jsonl(store.dead_letter_path)
-    quarantine = read_jsonl(store.quarantine_path)
+    existing_events = store_adapter.read_events()
+    manifest = store_adapter.read_manifest()
+    dead_letter = store_adapter.read_dead_letter()
+    quarantine = store_adapter.read_quarantine()
 
     # Every stored payload per dedup key (amendment A2), so re-delivery of any
     # known version is a duplicate rather than a version regression.
@@ -229,7 +233,7 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
     outcomes: list[FileOutcome] = []
 
     for path, data, digest in deliveries:
-        store.write_raw(digest, data)
+        store_adapter.write_raw(digest, data)
         counts = _empty_counts()
         file_events: list[dict] = []
         file_dead: list[dict] = []
@@ -237,8 +241,7 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
 
         if digest in applied:
             counts_out: dict[str, int] = counts
-            append_jsonl(
-                store.manifest_path,
+            store_adapter.append_manifest(
                 [
                     _manifest_row(
                         ingest_id=ingest_id,
@@ -279,9 +282,8 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
                         record=None,
                     )
                 )
-            append_jsonl(store.dead_letter_path, file_dead)
-            append_jsonl(
-                store.manifest_path,
+            store_adapter.append_dead_letter(file_dead)
+            store_adapter.append_manifest(
                 [
                     _manifest_row(
                         ingest_id=ingest_id,
@@ -318,9 +320,8 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
                         record=envelope,
                     )
                 )
-            append_jsonl(store.dead_letter_path, file_dead)
-            append_jsonl(
-                store.manifest_path,
+            store_adapter.append_dead_letter(file_dead)
+            store_adapter.append_manifest(
                 [
                     _manifest_row(
                         ingest_id=ingest_id,
@@ -419,11 +420,10 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
                 if target not in current_by_key:
                     counts["dangling_supersedes"] += 1
 
-        append_jsonl(store.events_path, file_events)
-        append_jsonl(store.dead_letter_path, file_dead)
-        append_jsonl(store.quarantine_path, file_quarantine)
-        append_jsonl(
-            store.manifest_path,
+        store_adapter.append_events(file_events)
+        store_adapter.append_dead_letter(file_dead)
+        store_adapter.append_quarantine(file_quarantine)
+        store_adapter.append_manifest(
             [
                 _manifest_row(
                     ingest_id=ingest_id,
@@ -447,7 +447,7 @@ def ingest(paths: Sequence[Path], home: Path | str) -> IngestReport:
         for key in COUNT_KEYS:
             totals[key] += outcome.counts[key]
 
-    store.write_report(
+    store_adapter.write_report(
         {
             "ingest_id": ingest_id,
             "files": [_outcome_dict(outcome) for outcome in outcomes],

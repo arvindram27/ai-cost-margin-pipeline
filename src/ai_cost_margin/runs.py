@@ -8,10 +8,18 @@ entry (including individual untracked files); deleted paths use a fixed marker.
 Golden generation uses the internal ``fixture_code_version`` path instead of a
 live HEAD, so a committed golden can never depend on its own future commit.
 
-Validation happens before this module is asked to write. A mid-write OS failure
-can leave a partial run directory; the next identical run detects it through
-the byte-compare replay check and exits 2. Nothing is deleted or repaired.
-Atomic publish remains M4 scope.
+Validation happens before this module is asked to write. The legacy
+``run_margins`` path still writes directly into ``<out>/<fingerprint>/``: a
+mid-write OS failure can leave a partial run directory and the next identical
+run detects it through the byte-compare replay check and exits 2.
+
+The Phase 4 runner passes ``attempt_token`` to get attempt-scoped atomic
+publish (amendment A3): it writes the complete file set into
+``<out>/.tmp-<token>/`` and only then renames that directory to
+``<out>/<fingerprint>/``. A pre-existing final directory is never overwritten;
+an exact byte-for-byte match is an exact replay, and any difference is a loud
+mismatch before any pointer change. Nothing is deleted or repaired, and a
+leftover temp directory is inert evidence.
 """
 
 from __future__ import annotations
@@ -221,12 +229,21 @@ def write_run_artifact(
     out_root: Path,
     fingerprint: str,
     files: dict[str, bytes],
+    *,
+    attempt_token: str | None = None,
 ) -> RunWriteResult:
     """Write a new run directory, or verify an exact replay without overwriting.
 
     ``files`` insertion order is the write order; the manifest is expected last.
     A pre-existing directory must contain exactly the same file names and bytes.
     Any missing, extra, or different file is a loud replay mismatch.
+
+    When ``attempt_token`` is given (the Phase 4 runner), the complete file set
+    is written to an attempt-scoped temp directory (``.tmp-<token>``, in the
+    same parent directory so the rename stays on one filesystem) and renamed
+    into place only after every file exists. The legacy default keeps the
+    Phase 3 behaviour byte for byte, including its partial-directory failure
+    mode.
     """
     out_root = Path(out_root)
     run_dir = out_root / fingerprint
@@ -246,11 +263,27 @@ def write_run_artifact(
                 raise ReplayMismatchError(f"existing run file differs: {name}")
         return RunWriteResult(run_dir, True)
 
+    if attempt_token is None:
+        try:
+            out_root.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir()
+            for name, data in files.items():
+                _write_bytes(run_dir / name, data)
+        except OSError as exc:
+            raise OutputError(f"cannot write run artifact: {exc}") from exc
+        return RunWriteResult(run_dir, False)
+
+    # A3: attempt-scoped temp publish. The temp name is operational metadata and
+    # never enters the run files; a leftover temp directory is inert evidence.
+    temp_dir = out_root / f".tmp-{attempt_token}"
     try:
         out_root.mkdir(parents=True, exist_ok=True)
-        run_dir.mkdir()
+        temp_dir.mkdir(exist_ok=False)
         for name, data in files.items():
-            _write_bytes(run_dir / name, data)
+            _write_bytes(temp_dir / name, data)
+        temp_dir.rename(run_dir)
+    except FileExistsError as exc:
+        raise OutputError(f"attempt temp directory already exists: {temp_dir.name}") from exc
     except OSError as exc:
         raise OutputError(f"cannot write run artifact: {exc}") from exc
     return RunWriteResult(run_dir, False)

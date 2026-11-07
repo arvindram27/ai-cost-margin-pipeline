@@ -10,10 +10,10 @@ aggregated into per-customer and per-workload-type simulated revenue and margin
 tables. Every stage is auditable and money-exact. Everything runs on synthetic
 fixtures; no real customer data has ever been ingested.
 
-**Status:** milestones M1 (ingestion), M2 (pricing and costing) and M3
-(aggregation and simulated margins) are built and tested. Determinism and
-recovery (M4) are next. The local app (M5) and the hosted demo (M6) are planned
-and approval-gated.
+**Status:** milestones M1 (ingestion), M2 (pricing and costing), M3
+(aggregation and simulated margins) and M4 (determinism and recovery) are
+built and tested. The local app (M5) and the hosted demo (M6) are planned and
+approval-gated.
 
 The target is a **production-oriented demo**, not a production-validated
 system: there is no multi-user access control, no security review, no SLA and
@@ -36,7 +36,7 @@ clear where a number came from.
 | M1        | Ingestion foundation: validation, dedup, quarantine, append-only store | Built and tested       |
 | M2        | Pricing: exact money, price series and intervals, costing engine     | Built and tested         |
 | M3        | Aggregation and margins per customer and workload type (simulated)   | Built and tested         |
-| M4        | Determinism and recovery: DuckDB store, atomic publish, checkpoints  | Next (design open)       |
+| M4        | Determinism and recovery: DuckDB store, atomic publish, checkpoints  | Built and tested         |
 | M5        | Local Streamlit app                                                  | Planned                  |
 | M6        | Hosted demo deployment                                               | Planned, approval-gated  |
 | M7, M8    | Optional extensions                                                  | Optional                 |
@@ -54,10 +54,14 @@ Editable source: [docs/diagrams/architecture.excalidraw](docs/diagrams/architect
   `(provider, account, provider_event_id)` key: an identical payload is a
   duplicate and is skipped; a changed payload is accepted only with a strictly
   higher `record_version`, otherwise it is quarantined.
-- **Append-only store.** Validated events land in `var/state/events.jsonl`
-  alongside a manifest, a dead-letter file, a quarantine file and a per-run
-  ingestion report. `var/` is private and gitignored. The store is plain JSONL
-  today; DuckDB arrives in M4.
+- **Append-only store.** The Phase 1 ingest CLI lands validated events in
+  `var/state/events.jsonl` alongside a manifest, a dead-letter file, a
+  quarantine file and a per-run ingestion report. The Phase 4 runner
+  (`python -m ai_cost_margin.pipeline`) does the whole run in one command
+  against a private DuckDB working store (`var/pipeline.duckdb`): each stage
+  commits its checkpoint atomically, an interrupted attempt resumes from its
+  last verified checkpoint, and the seven result files publish atomically
+  under the run fingerprint. `var/` is private and gitignored.
 - **Pricing (M2).** The price list is validated before any event is costed:
   one series per `(provider, model, unit)` - unit is input, output or cached -
   built from half-open `[from,to)` intervals that must be contiguous and
@@ -108,7 +112,15 @@ Editable source: [docs/diagrams/workflow.excalidraw](docs/diagrams/workflow.exca
     Simulated flat monthly plan revenue is allocated by billable token volume,
     with unpriced usage marking the month incomplete and unattributable usage
     kept in an unallocated bucket. A digest covers the financial tables only.
-12. (Planned, M5 + M6) A local Streamlit app, then an approval-gated hosted
+12. (M4) One command runs the whole pipeline: raw, validated, costed,
+    aggregated, publish. Each stage writes its rows and checkpoint in one
+    transaction, so a killed process leaves no partial committed stage: raw copies stay inert until their stage commits. The next
+    identical invocation adopts the interrupted attempt's verified prefix and
+    recomputes the rest; the seven files and the digest are identical either
+    way. Publishing is an atomic rename after every file exists; an exact
+    byte-for-byte rerun is reported as a replay, never rewritten. The
+    single-writer guarantee is cross-process.
+13. (Planned, M5 + M6) A local Streamlit app, then an approval-gated hosted
     demo.
 
 Every outcome is explicit: duplicate, dead-lettered, quarantined, superseded,
@@ -142,7 +154,7 @@ unpriced - nothing is silently dropped.
 
 ## Determinism and testing
 
-249 tests collected under pytest (248 passed, 1 skipped - the explicit golden-generation check). Ingestion reads no wall clock: `arrival_time` comes
+312 tests collected under pytest (311 passed, 1 skipped - the explicit golden-generation check). Phase 4 adds a three-point kill drill (`tools/kill_drill.py`): runs killed before the raw commit, before the costed commit and after the publish rename each resume to byte-identical results, and the published pointer never names a staged attempt. Ingestion reads no wall clock: `arrival_time` comes
 from the batch envelope and the ingest id is content-addressed. Golden
 fixtures pin the behavior the suite covers: the Phase 1 fixture generator
 reproduces the committed batches byte for byte, and the golden ingestion,
@@ -153,8 +165,11 @@ than a future commit hash.
 ## Honest limitations
 
 - Synthetic fixtures only; no real provider data has ever been ingested.
-- The store is plain JSONL files; a torn line is a hard stop. DuckDB, atomic
-  publish and crash recovery arrive in M4.
+- The single-writer guarantee is cross-process, enforced by the operating
+  system file lock DuckDB takes on open; two runner invocations inside one
+  process are not serialized by it, so the supported usage is one pipeline
+  runner invocation per OS process. The Phase 1-3 JSONL store is unchanged; a
+  torn line there is still a hard stop.
 - M3 revenue comes from synthetic flat monthly plans, not real contracts; it
   has no proration, discounts, taxes or credits. No app (M5) and no hosted
   deployment (M6) yet.
@@ -162,7 +177,7 @@ than a future commit hash.
 
 ## Stack
 
-Python 3.13, DuckDB (from M4), Streamlit (from M5), plain JSON inputs.
+Python 3.13, DuckDB, Streamlit (from M5), plain JSON inputs.
 Development happens on Windows; the commands below are PowerShell.
 
 | Direct dependency | Pin      | Why it is pinned                                                      |
@@ -240,4 +255,5 @@ ai-cost-margin-pipeline/
 - [Phase 1 ingestion contract](docs/phase-1-ingestion-contract.md)
 - [Phase 2 pricing contract](docs/phase-2-pricing-contract.md)
 - [Phase 3 margin contract](docs/phase-3-margin-contract.md)
+- [Phase 4 determinism and recovery contract](docs/phase-4-determinism-contract.md)
 - [Build log](build.md)

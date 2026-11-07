@@ -44,6 +44,7 @@ from .store import Store, StoreError, canonical_json, content_sha256, pretty_jso
 __all__ = [
     "MarginInputError",
     "PlanCurrencyMismatchError",
+    "assemble_artifact",
     "build_parser",
     "main",
     "run_margins",
@@ -60,6 +61,166 @@ class PlanCurrencyMismatchError(ValueError):
 
 def _json_lines(rows: Sequence[dict[str, Any]]) -> bytes:
     return "".join(canonical_json(row) + "\n" for row in rows).encode("utf-8")
+
+
+def assemble_artifact(
+    *,
+    included_events: Sequence[dict[str, Any]],
+    edges: Sequence[dict[str, Any]],
+    excluded_by_cutoff: int,
+    dangling_supersedes: int,
+    stored_events_count: int,
+    costing_report: dict[str, Any],
+    customer_margins: Sequence[dict[str, Any]],
+    workload_margins: Sequence[dict[str, Any]],
+    unallocated: Sequence[dict[str, Any]],
+    metrics: dict[str, Any],
+    price_list: Any,
+    plan_list: Any,
+    prices: Path,
+    plans: Path,
+    price_list_sha256: str,
+    plans_sha256: str,
+    cutoff: str,
+    code_version: Any,
+    manifest_store_inputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Compute the digest, report, manifest and seven files for one run.
+
+    Compute and write are separate (Phase 4). The legacy ``run_margins`` path
+    passes its JSONL store fields as ``manifest_store_inputs``; the Phase 4
+    runner passes the backend-neutral A7 fields. Everything else is shared, so
+    the digest definition and the financial tables cannot drift between them.
+    """
+    digest = compute_digest(customer_margins, workload_margins, unallocated)
+    fingerprint = compute_run_fingerprint(
+        included_events=included_events,
+        cutoff=cutoff,
+        price_list_sha256=price_list_sha256,
+        plans_sha256=plans_sha256,
+        code_version=code_version,
+    )
+
+    table_bytes = {
+        "customer_margins": render_table("customer_margins", customer_margins),
+        "workload_margins": render_table("workload_margins", workload_margins),
+        "unallocated": render_table("unallocated", unallocated),
+        "lineage": _json_lines(edges),
+    }
+    tables = {
+        "customer_margins": {
+            "file": "customer-margins.jsonl",
+            "rows": len(customer_margins),
+            "sha256": content_sha256(table_bytes["customer_margins"]),
+        },
+        "workload_margins": {
+            "file": "workload-margins.jsonl",
+            "rows": len(workload_margins),
+            "sha256": content_sha256(table_bytes["workload_margins"]),
+        },
+        "unallocated": {
+            "file": "unallocated.jsonl",
+            "rows": len(unallocated),
+            "sha256": content_sha256(table_bytes["unallocated"]),
+        },
+        "lineage": {
+            "file": "lineage.jsonl",
+            "rows": len(edges),
+            "sha256": content_sha256(table_bytes["lineage"]),
+        },
+    }
+
+    shared = {
+        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
+        "aggregation_definition_id": AGGREGATION_DEFINITION_ID,
+        "run_fingerprint": fingerprint,
+        "as_of_cutoff": cutoff,
+        **code_version.as_dict(),
+        "digest": digest,
+        "digest_definition": DIGEST_DEFINITION,
+        "tables": tables,
+    }
+    report = {
+        **shared,
+        "periods": metrics["periods"],
+        "currency": price_list.currency,
+        "cost_label": "estimated",
+        "revenue_label": "simulated",
+        "margin_label": "simulated",
+        "usage_label": "synthetic",
+        "price_list_id": price_list.price_list_id,
+        "price_list_label": price_list.label,
+        "price_list_sha256": price_list_sha256,
+        "plans_version_id": plan_list.plans_version_id,
+        "plans_label": plan_list.label,
+        "plans_sha256": plans_sha256,
+        "revenue_model_id": "flat-monthly-plan/v1",
+        "revenue_allocation_basis": "tokens_input_plus_output",
+        "events_in_store": stored_events_count,
+        "events_excluded_by_cutoff": excluded_by_cutoff,
+        "events_read": costing_report["events_read"],
+        "events_costed": costing_report["events_costed"],
+        "events_unpriced": costing_report["events_unpriced"],
+        "events_superseded": costing_report["events_superseded"],
+        "unpriced_by_reason": costing_report["unpriced_by_reason"],
+        "price_versions_used": costing_report["price_versions_used"],
+        "superseded_events_outside_active_cells": metrics["superseded_events_outside_active_cells"],
+        "unallocated_events_costed": metrics["unallocated_events_costed"],
+        "unallocated_events_unpriced": metrics["unallocated_events_unpriced"],
+        "unallocated_events_superseded": metrics["unallocated_events_superseded"],
+        "unallocated_cost_units": metrics["unallocated_cost_units"],
+        "total_cost_units": metrics["total_cost_units"],
+        "unallocated_cost_share_bp": metrics["unallocated_cost_share_bp"],
+        "unallocated_event_share_bp": metrics["unallocated_event_share_bp"],
+        "customer_rows": metrics["customer_rows"],
+        "workload_rows": metrics["workload_rows"],
+        "workload_rows_allocated": metrics["workload_rows_allocated"],
+        "workload_rows_incomplete_unpriced_basis": metrics["workload_rows_incomplete_unpriced_basis"],
+        "workload_rows_basis_unavailable": metrics["workload_rows_basis_unavailable"],
+        "incomplete_customer_margins": metrics["incomplete_customer_margins"],
+        "incomplete_workload_margins": metrics["incomplete_workload_margins"],
+        "dangling_supersedes": dangling_supersedes,
+        "composition_status": "verified",
+    }
+    manifest = {
+        **shared,
+        "periods": metrics["periods"],
+        "inputs": {
+            "price_list_file": prices.name,
+            "price_list_id": price_list.price_list_id,
+            "price_list_sha256": price_list_sha256,
+            "plans_file": plans.name,
+            "plans_version_id": plan_list.plans_version_id,
+            "plans_label": plan_list.label,
+            "plans_sha256": plans_sha256,
+            **manifest_store_inputs,
+        },
+        "labels": {
+            "usage": "synthetic",
+            "cost": "estimated",
+            "revenue": "simulated",
+            "margin": "simulated",
+        },
+    }
+
+    files = {
+        "customer-margins.jsonl": table_bytes["customer_margins"],
+        "workload-margins.jsonl": table_bytes["workload_margins"],
+        "unallocated.jsonl": table_bytes["unallocated"],
+        "lineage.jsonl": table_bytes["lineage"],
+        "margin-report.json": (pretty_json(report) + "\n").encode("utf-8"),
+        "margin-digest.txt": digest_text(digest),
+        "run-manifest.json": (pretty_json(manifest) + "\n").encode("utf-8"),
+    }
+    return {
+        "run_fingerprint": fingerprint,
+        "digest": digest,
+        "report": report,
+        "manifest": manifest,
+        "files": files,
+        "table_bytes": table_bytes,
+        "tables": tables,
+    }
 
 
 def run_margins(
@@ -95,11 +256,6 @@ def run_margins(
     costed_rows, costing_report = cost_events(lineage.events, price_list)
     aggregated = aggregate_rows(costed_rows, lineage.events, plan_list, price_list.currency)
 
-    digest = compute_digest(
-        aggregated.customer_margins,
-        aggregated.workload_margins,
-        aggregated.unallocated,
-    )
     price_list_hash = content_sha256(prices.read_bytes())
     plans_hash = content_sha256(plans.read_bytes())
     store_hash = content_sha256(events_path.read_bytes()) if events_path.exists() else content_sha256(b"")
@@ -108,139 +264,45 @@ def run_margins(
         code_version = fixture_code_version(code_version_override)
     else:
         code_version = resolve_code_version(repo_root)
-    fingerprint = compute_run_fingerprint(
+
+    artifact = assemble_artifact(
         included_events=lineage.events,
-        cutoff=cutoff,
+        edges=lineage.edges,
+        excluded_by_cutoff=lineage.excluded_by_cutoff,
+        dangling_supersedes=lineage.dangling_supersedes,
+        stored_events_count=len(stored_events),
+        costing_report=costing_report,
+        customer_margins=aggregated.customer_margins,
+        workload_margins=aggregated.workload_margins,
+        unallocated=aggregated.unallocated,
+        metrics=aggregated.metrics,
+        price_list=price_list,
+        plan_list=plan_list,
+        prices=prices,
+        plans=plans,
         price_list_sha256=price_list_hash,
         plans_sha256=plans_hash,
+        cutoff=cutoff,
         code_version=code_version,
-    )
-
-    table_bytes = {
-        "customer_margins": render_table("customer_margins", aggregated.customer_margins),
-        "workload_margins": render_table("workload_margins", aggregated.workload_margins),
-        "unallocated": render_table("unallocated", aggregated.unallocated),
-        "lineage": _json_lines(lineage.edges),
-    }
-    tables = {
-        "customer_margins": {
-            "file": "customer-margins.jsonl",
-            "rows": len(aggregated.customer_margins),
-            "sha256": content_sha256(table_bytes["customer_margins"]),
-        },
-        "workload_margins": {
-            "file": "workload-margins.jsonl",
-            "rows": len(aggregated.workload_margins),
-            "sha256": content_sha256(table_bytes["workload_margins"]),
-        },
-        "unallocated": {
-            "file": "unallocated.jsonl",
-            "rows": len(aggregated.unallocated),
-            "sha256": content_sha256(table_bytes["unallocated"]),
-        },
-        "lineage": {
-            "file": "lineage.jsonl",
-            "rows": len(lineage.edges),
-            "sha256": content_sha256(table_bytes["lineage"]),
-        },
-    }
-
-    shared = {
-        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
-        "aggregation_definition_id": AGGREGATION_DEFINITION_ID,
-        "run_fingerprint": fingerprint,
-        "as_of_cutoff": cutoff,
-        **code_version.as_dict(),
-        "digest": digest,
-        "digest_definition": DIGEST_DEFINITION,
-        "tables": tables,
-    }
-    metrics = aggregated.metrics
-    report = {
-        **shared,
-        "periods": metrics["periods"],
-        "currency": price_list.currency,
-        "cost_label": "estimated",
-        "revenue_label": "simulated",
-        "margin_label": "simulated",
-        "usage_label": "synthetic",
-        "price_list_id": price_list.price_list_id,
-        "price_list_label": price_list.label,
-        "price_list_sha256": price_list_hash,
-        "plans_version_id": plan_list.plans_version_id,
-        "plans_label": plan_list.label,
-        "plans_sha256": plans_hash,
-        "revenue_model_id": "flat-monthly-plan/v1",
-        "revenue_allocation_basis": "tokens_input_plus_output",
-        "events_in_store": len(stored_events),
-        "events_excluded_by_cutoff": lineage.excluded_by_cutoff,
-        "events_read": costing_report["events_read"],
-        "events_costed": costing_report["events_costed"],
-        "events_unpriced": costing_report["events_unpriced"],
-        "events_superseded": costing_report["events_superseded"],
-        "unpriced_by_reason": costing_report["unpriced_by_reason"],
-        "price_versions_used": costing_report["price_versions_used"],
-        "superseded_events_outside_active_cells": metrics["superseded_events_outside_active_cells"],
-        "unallocated_events_costed": metrics["unallocated_events_costed"],
-        "unallocated_events_unpriced": metrics["unallocated_events_unpriced"],
-        "unallocated_events_superseded": metrics["unallocated_events_superseded"],
-        "unallocated_cost_units": metrics["unallocated_cost_units"],
-        "total_cost_units": metrics["total_cost_units"],
-        "unallocated_cost_share_bp": metrics["unallocated_cost_share_bp"],
-        "unallocated_event_share_bp": metrics["unallocated_event_share_bp"],
-        "customer_rows": metrics["customer_rows"],
-        "workload_rows": metrics["workload_rows"],
-        "workload_rows_allocated": metrics["workload_rows_allocated"],
-        "workload_rows_incomplete_unpriced_basis": metrics["workload_rows_incomplete_unpriced_basis"],
-        "workload_rows_basis_unavailable": metrics["workload_rows_basis_unavailable"],
-        "incomplete_customer_margins": metrics["incomplete_customer_margins"],
-        "incomplete_workload_margins": metrics["incomplete_workload_margins"],
-        "dangling_supersedes": lineage.dangling_supersedes,
-        "composition_status": "verified",
-    }
-    manifest = {
-        **shared,
-        "periods": metrics["periods"],
-        "inputs": {
-            "price_list_file": prices.name,
-            "price_list_id": price_list.price_list_id,
-            "price_list_sha256": price_list_hash,
-            "plans_file": plans.name,
-            "plans_version_id": plan_list.plans_version_id,
-            "plans_label": plan_list.label,
-            "plans_sha256": plans_hash,
+        manifest_store_inputs={
             "store_events_file": events_path.name,
             "store_events_sha256": store_hash,
             "events_in_store": len(stored_events),
             "events_included": len(lineage.events),
             "events_excluded_by_cutoff": lineage.excluded_by_cutoff,
         },
-        "labels": {
-            "usage": "synthetic",
-            "cost": "estimated",
-            "revenue": "simulated",
-            "margin": "simulated",
-        },
-    }
-
-    files = {
-        "customer-margins.jsonl": table_bytes["customer_margins"],
-        "workload-margins.jsonl": table_bytes["workload_margins"],
-        "unallocated.jsonl": table_bytes["unallocated"],
-        "lineage.jsonl": table_bytes["lineage"],
-        "margin-report.json": (pretty_json(report) + "\n").encode("utf-8"),
-        "margin-digest.txt": digest_text(digest),
-        "run-manifest.json": (pretty_json(manifest) + "\n").encode("utf-8"),
-    }
-    write_result = write_run_artifact(out_root, fingerprint, files)
+    )
+    write_result = write_run_artifact(
+        out_root, artifact["run_fingerprint"], artifact["files"]
+    )
     return {
         "run_dir": write_result.run_dir,
-        "run_fingerprint": fingerprint,
+        "run_fingerprint": artifact["run_fingerprint"],
         "replayed": write_result.replayed,
-        "digest": digest,
-        "report": report,
-        "manifest": manifest,
-        "files": files,
+        "digest": artifact["digest"],
+        "report": artifact["report"],
+        "manifest": artifact["manifest"],
+        "files": artifact["files"],
     }
 
 
