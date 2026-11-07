@@ -1,0 +1,9 @@
+# AI Cost & Margin Pipeline - Phase 0 dependency input.
+# Pins verified on PyPI 2026-11-07; any version change is a reviewed change.
+#   streamlit==1.67.0  Requires-Python >=3.11  py3-none-any   https://pypi.org/pypi/streamlit/1.67.0/json
+#   duckdb==2.0.0      Requires-Python >=3.11  cp312-abi3    https://pypi.org/pypi/duckdb/2.0.0/json
+#   pytest==9.2.0      Requires-Python >=3.10  py3-none-any   https://pypi.org/pypi/pytest/9.2.0/json
+# Installed with --only-binary :all:. Transitive pins are not fixed here.
+streamlit==1.67.0
+duckdb==2.0.0
+pytest==9.2.0

@@ -1,0 +1,3 @@
+# Normalize line endings on commit so Windows CRLF does not create noisy diffs.
+# Git's own binary detection covers images and other non-text files.
+* text=auto

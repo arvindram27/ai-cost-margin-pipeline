@@ -1,0 +1,47 @@
+# --- Private offline working state (never committed) ---------------------------
+# Raw event store, run history, ingestion manifests and working DuckDB databases.
+var/
+
+# DuckDB databases and their write-ahead logs
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+*.wal
+
+# --- Secrets -------------------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+.streamlit/secrets.toml
+
+# --- Python --------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# --- Tooling caches ------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Editor and OS -------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# OneDrive / Office lock and temporary files
+~$*
+.~lock.*
+
+# --- Logs ----------------------------------------------------------------------
+*.log
