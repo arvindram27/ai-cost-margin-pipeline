@@ -111,6 +111,8 @@ Every number the pipeline produces is labelled **actual**, **estimated** or
 
 ## Not present yet
 
-No pricing, no aggregation, no margins, no export, no Streamlit app, no hosted
-deployment, no CI, no license yet. Ingestion runs on synthetic fixtures only: the
-durable DuckDB store, staged checkpoints and crash recovery arrive in Phase 4.
+No aggregation, no margins, no export, no Streamlit app, no hosted deployment, no
+CI, no license yet. Costs are estimated from a versioned synthetic price list
+labelled synthetic; they are estimates, never billed amounts. Ingestion and
+costing run on synthetic fixtures only: the durable DuckDB store, staged
+checkpoints and crash recovery arrive in Phase 4.

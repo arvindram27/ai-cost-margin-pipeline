@@ -1,0 +1,22 @@
+{
+  "cost_label": "estimated",
+  "currency": "USD",
+  "events_costed": 15,
+  "events_read": 19,
+  "events_superseded": 2,
+  "events_unpriced": 2,
+  "price_list_id": "synthetic-prices-v1",
+  "price_list_label": "synthetic",
+  "price_versions_used": [
+    "synthetic-prices-v1/synth-large/2026-10-01",
+    "synthetic-prices-v1/synth-large/2026-10-16",
+    "synthetic-prices-v1/synth-small/2026-10-01",
+    "synthetic-prices-v1/synth-small/2026-10-16"
+  ],
+  "unpriced_by_reason": {
+    "inconsistent_token_counts": 0,
+    "model_not_in_price_list": 0,
+    "no_applicable_rate": 0,
+    "token_count_unavailable": 2
+  }
+}
