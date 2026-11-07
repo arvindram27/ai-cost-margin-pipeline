@@ -1,0 +1,36 @@
+{
+  "currency": "USD",
+  "entries": [
+    {
+      "currency": "USD",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": "2026-10-16T00:00:00Z",
+      "model": "synth-small",
+      "price_version_id": "invalid-bad-interval/synth-small/2026-10-01",
+      "provider": "synthetic-token-provider",
+      "rates_per_million": {
+        "cached": "0.150000",
+        "input": "0.750000",
+        "output": "2.250000"
+      }
+    },
+    {
+      "currency": "USD",
+      "effective_from": "2026-10-16T00:00:00Z",
+      "effective_to": "2026-10-16T00:00:00Z",
+      "model": "synth-small",
+      "price_version_id": "invalid-bad-interval/synth-small/2026-10-16",
+      "provider": "synthetic-token-provider",
+      "rates_per_million": {
+        "cached": "0.187500",
+        "input": "0.937500",
+        "output": "2.812500"
+      }
+    }
+  ],
+  "label": "synthetic",
+  "notes": "Negative fixture: the second interval starts and ends at the same instant.",
+  "price_list_id": "invalid-bad-interval",
+  "rate_unit": "per_1_000_000_tokens",
+  "timezone": "UTC"
+}

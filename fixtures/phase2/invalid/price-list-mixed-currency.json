@@ -1,0 +1,49 @@
+{
+  "currency": "USD",
+  "entries": [
+    {
+      "currency": "USD",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": "2026-10-16T00:00:00Z",
+      "model": "synth-small",
+      "price_version_id": "invalid-mixed-currency/synth-small/2026-10-01",
+      "provider": "synthetic-token-provider",
+      "rates_per_million": {
+        "cached": "0.150000",
+        "input": "0.750000",
+        "output": "2.250000"
+      }
+    },
+    {
+      "currency": "USD",
+      "effective_from": "2026-10-16T00:00:00Z",
+      "effective_to": null,
+      "model": "synth-small",
+      "price_version_id": "invalid-mixed-currency/synth-small/2026-10-16",
+      "provider": "synthetic-token-provider",
+      "rates_per_million": {
+        "cached": "0.187500",
+        "input": "0.937500",
+        "output": "2.812500"
+      }
+    },
+    {
+      "currency": "EUR",
+      "effective_from": "2026-10-01T00:00:00Z",
+      "effective_to": null,
+      "model": "synth-large",
+      "price_version_id": "invalid-mixed-currency/synth-large/2026-10-01",
+      "provider": "synthetic-token-provider",
+      "rates_per_million": {
+        "cached": "0.300000",
+        "input": "1.500000",
+        "output": "4.500000"
+      }
+    }
+  ],
+  "label": "synthetic",
+  "notes": "Negative fixture: the list currency is USD but the synth-large entry is priced in EUR.",
+  "price_list_id": "invalid-mixed-currency",
+  "rate_unit": "per_1_000_000_tokens",
+  "timezone": "UTC"
+}
