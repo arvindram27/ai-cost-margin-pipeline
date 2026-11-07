@@ -82,3 +82,20 @@ Rules:
 - State after this entry: in progress
 - Blockers: none
 - Next step: await the push gate approval
+
+---
+
+### Entry 3 - 2026-11-07 18:41 IST
+
+- Phase: 2 - Pricing engine with synthetic prices
+- Tool/model: DeepSeek Harness (deepseek-flash)
+- Verified base (last commit verified by review): aa2495b (Phase 1 log commit; no Phase 2 commit is review-verified yet)
+- HEAD at work start (may include unverified commits; a dirty mid-phase HEAD is not a verified base): aa2495b (P1-C5) at phase start
+- What changed: Phase 2 added a synthetic pricing engine over the Phase 1 store. C1 added the exact decimal money type, the price-list model with fatal interval validation, the synthetic price list with its four negative fixtures, and the pricing contract document. C2 added the costing engine with the unpriced bucket and per-unit price-version provenance. C3 added the pricing test suite, the timestamp-parity and non-UTF-8 regression tests, the frozen golden costed outputs, and the README wording correction. Two scoped repair gates preceded commit. A command abort was followed by a corrected retry without approval; future command errors stop for review.
+- Tests run (command -> short result summary, author-reported until review): original venv `python -m pytest` -> 172 passed, exit 0. Clean clone: `py -3.13 -m venv` then `pip install --only-binary :all: -r requirements.txt` -> install exit 0; `pip freeze` identical between the two venvs (40 entries each, resolved Python 3.13.3 in both) with all three direct pins exact; `python -m pytest` -> 172 passed, exit 0; golden ingest -> 19 rows, state/events.jsonl 10479 bytes and hash-equal to the committed expected file; golden costing -> 15 costed, 2 unpriced, 2 superseded, both outputs byte-identical to the committed goldens; five negative checks (four invalid price lists and one non-UTF-8 file) each exited 2 with no output directory created. All results are author-reported and not independently verified by review; the clean clone is a second local environment on one machine, not external verification.
+- Provenance/data notes (which fixtures or inputs were touched): synthetic price list and synthetic fixtures only; no provider rates, no live calls and no customer data. The working store stays under var/ and is gitignored; every cost is labelled estimated and every price list is labelled synthetic.
+- Commits produced (hashes pasted from `git log`): 5229dfd3ac2953f25ea132f3e84247eaae69625d (C1, decimal money and price-list model with interval validation), 2be7c7c5956a2badb1e36d9b91c70e2c9311a982 (C2, costing engine with unpriced bucket and price-version provenance), 6b4f1ff76d55a0f6b4e735d23e1b9be029f41201 (C3, pricing tests and golden costed outputs)
+- Log commit (hash of the commit that added the PREVIOUS entry): aa2495b78b9380ed882f6b9e01c11e4a2c6bc749 (the commit carrying Entry 2)
+- State after this entry: in progress
+- Blockers: none
+- Next step: await the push gate approval
