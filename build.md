@@ -116,3 +116,20 @@ Rules:
 - State after this entry: verified at e3096562ff6d4bbc74cfef48ca0e52a0d0d97835
 - Blockers: none
 - Next step: Phase 4 planning (M4: DuckDB store, atomic publish, crash recovery) in Plan mode.
+
+---
+
+### Entry 5 - 2026-11-08 03:18 IST
+
+- Phase: 4 - Determinism and recovery (M4)
+- Tool/model: OpenCode (model not recorded)
+- Verified base (last commit verified by review): 99ea22b554b4fa1785519d1c3d40514317688488 (verified by the Phase 3 closeout review)
+- HEAD at work start (may include unverified commits; a dirty mid-phase HEAD is not a verified base): 99ea22b554b4fa1785519d1c3d40514317688488 at phase start
+- What changed: the amended Phase 4 plan (A1-A10) added the one-command runner. Four source files were modified (ingest, margins, runs, store: the A6 adapter seam, the backend-neutral manifest shape and the attempt-scoped publish) and eleven files were added (the DuckDB working store with transactional stage checkpoints, resumable attempts, atomic publish and the publish pointer; the store adapter; the pipeline runner; the determinism and recovery contract; the three-point kill drill; six test files). Process record: the first build stopped at the lock probe when the planned lock phrases did not match the observed Windows runtime and a same-process contention assumption proved wrong; the mapping was corrected to the observed cross-process sharing-violation classification, and the contract now states the cross-process-only boundary plainly. A Plan-mode source check caught the same wrong assumption in the CLI busy test before the correction ran. The first full suite then surfaced five failures in the never-before-run Phase 4 tests (three test transaction setups, one test expectation contradicting the A2 resume rule, and a Windows path-length overflow in the attempt temp-directory name); a bounded four-file repair followed, a Plan check corrected one assertion sequence in that repair, and the final verification passed.
+- Tests run (command -> short result summary): all runtime results below are author-reported from the gated local runs; the independent review did not rerun them. venv `python -m pytest` -> 311 passed, 1 skipped (the explicit golden-generation check), 312 collected, exit 0. The one-command run against a fresh evidence root printed the pinned golden digest 39240f3cdd813b7cd7ac67a421a303bc47cf4268ca390b51e81a03ebfe52edf0, the five compared golden files matched byte for byte, an exact replay was reported not rewritten, and the three-point kill drill passed. Static checks by the independent review: the source export's eleven untouched files matched the pre-repair hashes byte for byte and its four v3 edits landed exactly; the final bundle's eleven untouched files matched the reviewed export byte for byte and its four v4 edits landed exactly, with every byte outside the scope preserved; the exported 86-file baseline and first stopped-state records matched their reported hashes. The base 82-file comparison and the second stopped-state record are author-reported local results only, not exported or reverified.
+- Provenance/data notes (which fixtures or inputs were touched): synthetic Phase 1-3 fixtures only; no real customer data, no real provider rates and no live calls. The committed Phase 3 goldens stay byte-exact; the runner's manifest uses the backend-neutral store shape (`store_backend = "duckdb"`, `store_locator = "pipeline.duckdb"`) and is never compared to a golden. The working store, run history and evidence roots stay under var/ and are gitignored.
+- Commits produced (hashes pasted from `git log`): 64fe19d964ac2a113d834ed86b073bda15a68cc5 (M4: one-command runner, determinism and recovery contract, README and diagram updates)
+- Log commit (hash of the commit that added the PREVIOUS entry): 99ea22b554b4fa1785519d1c3d40514317688488 (the commit carrying Entry 4)
+- State after this entry: committed at 64fe19d964ac2a113d834ed86b073bda15a68cc5; independent review pending
+- Blockers: none
+- Next step: Phase 5 planning (M5: local Streamlit app) in Plan mode.
