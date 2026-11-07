@@ -1,0 +1,67 @@
+{
+  "account_id": "acct-demo",
+  "arrival_time": "2026-11-01T00:00:00Z",
+  "batch_id": "batch-006",
+  "events": [
+    {
+      "attempt_id": "1",
+      "customer_id": "cust-002",
+      "feature": "demo-assistant",
+      "model": "synth-large",
+      "provider_event_id": "evt-006-001",
+      "record_version": 1,
+      "request_id": "req-006-001",
+      "schema_version": "1.0",
+      "supersedes": null,
+      "tokens_cached": null,
+      "tokens_input": null,
+      "tokens_output": null,
+      "unavailable_fields": [
+        "tokens_input",
+        "tokens_output",
+        "tokens_cached"
+      ],
+      "usage_time": "2026-10-23T09:30:00Z",
+      "workload_type": "spiky"
+    },
+    {
+      "attempt_id": "1",
+      "customer_id": "cust-003",
+      "feature": "demo-assistant",
+      "model": "synth-small",
+      "provider_event_id": "evt-006-002",
+      "record_version": 1,
+      "request_id": "req-006-002",
+      "schema_version": "1.0",
+      "supersedes": null,
+      "tokens_cached": 64,
+      "tokens_input": null,
+      "tokens_output": null,
+      "unavailable_fields": [
+        "tokens_input",
+        "tokens_output"
+      ],
+      "usage_time": "2026-10-23T11:15:00Z",
+      "workload_type": "cache_heavy"
+    },
+    {
+      "attempt_id": "1",
+      "customer_id": "cust-004",
+      "feature": "demo-assistant",
+      "model": "synth-small",
+      "provider_event_id": "evt-006-003",
+      "record_version": 1,
+      "request_id": "req-006-003",
+      "schema_version": "1.0",
+      "supersedes": null,
+      "tokens_cached": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "unavailable_fields": [],
+      "usage_time": "2026-10-23T13:45:00Z",
+      "workload_type": "short_light"
+    }
+  ],
+  "provider": "synthetic-token-provider",
+  "schema_version": "1.0"
+}
