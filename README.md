@@ -4,16 +4,16 @@ A local, deterministic data pipeline working toward one question per customer:
 *what did this usage cost to serve, what did the customer pay, and is the price
 sustainable?*
 
-Today it builds the first part of that answer: raw AI usage events are
-validated, deduplicated and costed against a versioned synthetic price list,
-producing auditable, money-exact cost rows. The aggregation, revenue and margin
-layers that answer the rest of the question are designed but not built yet
-(M3 onward). Everything runs on synthetic fixtures; no real customer data has
-ever been ingested.
+Today it builds the answer through M3: raw AI usage events are validated,
+deduplicated and costed against a versioned synthetic price list, then
+aggregated into per-customer and per-workload-type simulated revenue and margin
+tables. Every stage is auditable and money-exact. Everything runs on synthetic
+fixtures; no real customer data has ever been ingested.
 
-**Status:** milestones M1 (ingestion) and M2 (pricing and costing) are built
-and tested. Aggregation and margins (M3) are next. The local app (M5) and the
-hosted demo (M6) are planned and approval-gated.
+**Status:** milestones M1 (ingestion), M2 (pricing and costing) and M3
+(aggregation and simulated margins) are built and tested. Determinism and
+recovery (M4) are next. The local app (M5) and the hosted demo (M6) are planned
+and approval-gated.
 
 The target is a **production-oriented demo**, not a production-validated
 system: there is no multi-user access control, no security review, no SLA and
@@ -35,8 +35,8 @@ clear where a number came from.
 | --------- | -------------------------------------------------------------------- | ------------------------ |
 | M1        | Ingestion foundation: validation, dedup, quarantine, append-only store | Built and tested       |
 | M2        | Pricing: exact money, price series and intervals, costing engine     | Built and tested         |
-| M3        | Aggregation and margins per user, feature, model, day                | Next (design open)       |
-| M4        | Determinism and recovery: DuckDB store, atomic publish, checkpoints  | Planned                  |
+| M3        | Aggregation and margins per customer and workload type (simulated)   | Built and tested         |
+| M4        | Determinism and recovery: DuckDB store, atomic publish, checkpoints  | Next (design open)       |
 | M5        | Local Streamlit app                                                  | Planned                  |
 | M6        | Hosted demo deployment                                               | Planned, approval-gated  |
 | M7, M8    | Optional extensions                                                  | Optional                 |
@@ -102,8 +102,12 @@ Editable source: [docs/diagrams/workflow.excalidraw](docs/diagrams/workflow.exca
    unusable token counts) is unpriced with a named reason.
 10. Outputs are written to a fresh directory: `costed-events.jsonl` and
     `costing-report.json`.
-11. (Planned, M3) Costed rows aggregate to usage, cost, revenue and margin
-    per user, feature, model and day.
+11. (M3) An as-of cutoff selects stored records by `arrival_time`; the two
+    supersession rules produce directed lineage edges. Costed rows aggregate to
+    one row per customer-month and one per customer-month-workload-type.
+    Simulated flat monthly plan revenue is allocated by billable token volume,
+    with unpriced usage marking the month incomplete and unattributable usage
+    kept in an unallocated bucket. A digest covers the financial tables only.
 12. (Planned, M5 + M6) A local Streamlit app, then an approval-gated hosted
     demo.
 
@@ -138,19 +142,22 @@ unpriced - nothing is silently dropped.
 
 ## Determinism and testing
 
-172 tests under pytest. Ingestion reads no wall clock: `arrival_time` comes
+249 tests collected under pytest (248 passed, 1 skipped - the explicit golden-generation check). Ingestion reads no wall clock: `arrival_time` comes
 from the batch envelope and the ingest id is content-addressed. Golden
 fixtures pin the behavior the suite covers: the Phase 1 fixture generator
-reproduces the committed batches byte for byte, and the golden ingestion and
-golden costing checks reproduce their frozen expected outputs byte for byte.
+reproduces the committed batches byte for byte, and the golden ingestion,
+golden costing and golden margin checks reproduce their frozen expected outputs
+byte for byte. Phase 3 goldens carry a fixed fixture code-version label rather
+than a future commit hash.
 
 ## Honest limitations
 
 - Synthetic fixtures only; no real provider data has ever been ingested.
 - The store is plain JSONL files; a torn line is a hard stop. DuckDB, atomic
   publish and crash recovery arrive in M4.
-- No aggregation, margins or revenue yet (M3), no app (M5), no hosted
-  deployment (M6).
+- M3 revenue comes from synthetic flat monthly plans, not real contracts; it
+  has no proration, discounts, taxes or credits. No app (M5) and no hosted
+  deployment (M6) yet.
 - No CI, and no license file yet.
 
 ## Stack
@@ -218,8 +225,10 @@ ai-cost-margin-pipeline/
   docs/                 brief, roadmap, phase contracts, diagrams
   fixtures/phase1/      synthetic ingestion batches and frozen expected outputs
   fixtures/phase2/      synthetic price list, invalid cases, expected outputs
+  fixtures/phase3/      simulated plans, late/correction batches, golden margins
   src/ai_cost_margin/   shared pipeline package
   tests/                pytest suite
+  tools/                independent hand-calculation checks
   var/                  private working state, gitignored
   build.md              append-only record of progress and evidence
 ```
@@ -230,4 +239,5 @@ ai-cost-margin-pipeline/
 - [Implementation roadmap](docs/ai-unit-economics-implementation-roadmap.md)
 - [Phase 1 ingestion contract](docs/phase-1-ingestion-contract.md)
 - [Phase 2 pricing contract](docs/phase-2-pricing-contract.md)
+- [Phase 3 margin contract](docs/phase-3-margin-contract.md)
 - [Build log](build.md)
