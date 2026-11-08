@@ -4,15 +4,16 @@ A local, deterministic data pipeline working toward one question per customer:
 *what did this usage cost to serve, what did the customer pay, and is the price
 sustainable?*
 
-Today it builds the answer through M3: raw AI usage events are validated,
+Today it builds the answer through M5: raw AI usage events are validated,
 deduplicated and costed against a versioned synthetic price list, then
 aggregated into per-customer and per-workload-type simulated revenue and margin
-tables. Every stage is auditable and money-exact. Everything runs on synthetic
+tables, and a local Streamlit app shows a sanitized export of those tables.
+Every stage is auditable and money-exact. Everything runs on synthetic
 fixtures; no real customer data has ever been ingested.
 
 **Status:** milestones M1 (ingestion), M2 (pricing and costing), M3
-(aggregation and simulated margins) and M4 (determinism and recovery) are
-built and tested. The local app (M5) and the hosted demo (M6) are planned and
+(aggregation and simulated margins), M4 (determinism and recovery) and M5
+(the local app) are built and tested. The hosted demo (M6) is planned and
 approval-gated.
 
 The target is a **production-oriented demo**, not a production-validated
@@ -37,7 +38,7 @@ clear where a number came from.
 | M2        | Pricing: exact money, price series and intervals, costing engine     | Built and tested         |
 | M3        | Aggregation and margins per customer and workload type (simulated)   | Built and tested         |
 | M4        | Determinism and recovery: DuckDB store, atomic publish, checkpoints  | Built and tested         |
-| M5        | Local Streamlit app                                                  | Planned                  |
+| M5        | Local Streamlit app                                                  | Built and tested         |
 | M6        | Hosted demo deployment                                               | Planned, approval-gated  |
 | M7, M8    | Optional extensions                                                  | Optional                 |
 
@@ -78,12 +79,30 @@ Editable source: [docs/diagrams/architecture.excalidraw](docs/diagrams/architect
   row labelled costed, superseded or unpriced; amounts are null when
   unpriced) and `costing-report.json` (counts, totals, unpriced reasons,
   `cost_label: "estimated"`, `price_list_label: "synthetic"`).
+- **Sanitized export (M5).** The export generator (`python -m ai_cost_margin.export`)
+  turns one verified published run into eight committed files under
+  `app/export/`: the margin tables, sanitized scenario events and lineage with
+  surrogate `evt-NNNN` keys (no raw provider event IDs, account IDs, request IDs,
+  provider attempt IDs or payload hashes), the synthetic price list, the
+  simulated plans, and an export manifest. Before it writes anything it binds
+  the published run files to the store's stage rows through six consistency
+  checks, and it records two distinct digests: the attested source financial
+  digest and an integrity digest over the export bytes.
+- **Local app (M5).** The Streamlit app (`app/streamlit_app.py`) reads the
+  committed export read-only and verifies it on load. It has four sections:
+  customers, workload breakdown, what-if scenarios and provenance. What-if
+  scenarios are recomputed in memory through the same pricing, costing,
+  allocation and aggregation code as the pipeline. Scenario choices live only in
+  the browser session, and the app code does not write scenario results to disk.
 
 ## Workflow
 
 ![Workflow](docs/diagrams/workflow.png)
 
 Editable source: [docs/diagrams/workflow.excalidraw](docs/diagrams/workflow.excalidraw).
+
+Note: both diagrams were last updated at M4 and do not show the M5 app. The
+numbered steps below are current.
 
 1. A batch arrives as one JSON file: an envelope plus its events.
 2. The batch content is hashed (SHA-256) and copied atomically into `raw/`.
@@ -120,8 +139,12 @@ Editable source: [docs/diagrams/workflow.excalidraw](docs/diagrams/workflow.exca
     way. Publishing is an atomic rename after every file exists; an exact
     byte-for-byte rerun is reported as a replay, never rewritten. The
     single-writer guarantee is cross-process.
-13. (Planned, M5 + M6) A local Streamlit app, then an approval-gated hosted
-    demo.
+13. (M5) The verified published run is exported to the sanitized dataset under
+    `app/export/`, and a local Streamlit app serves it read-only: customers,
+    workload breakdown, what-if scenarios recomputed through the same engine,
+    and a provenance panel showing the source digest, the recomputed digest and
+    whether they match. The hosted demo (M6) is still planned and
+    approval-gated.
 
 Every outcome is explicit: duplicate, dead-lettered, quarantined, superseded,
 unpriced - nothing is silently dropped.
@@ -154,7 +177,7 @@ unpriced - nothing is silently dropped.
 
 ## Determinism and testing
 
-312 tests collected under pytest (311 passed, 1 skipped - the explicit golden-generation check). Phase 4 adds a three-point kill drill (`tools/kill_drill.py`): runs killed before the raw commit, before the costed commit and after the publish rename each resume to byte-identical results, and the published pointer never names a staged attempt. Ingestion reads no wall clock: `arrival_time` comes
+332 tests collected under pytest (331 passed, 1 skipped - the explicit golden-generation check). The Phase 5 tests cover the scenario engine against hand-calculated values, the app pages through Streamlit AppTest (including isolation between two simulated sessions and the app's refusal of a tampered export), and a direct test that the export loader refuses a tampered copy. Phase 4 adds a three-point kill drill (`tools/kill_drill.py`): runs killed before the raw commit, before the costed commit and after the publish rename each resume to byte-identical results, and the published pointer never names a staged attempt. Ingestion reads no wall clock: `arrival_time` comes
 from the batch envelope and the ingest id is content-addressed. Golden
 fixtures pin the behavior the suite covers: the Phase 1 fixture generator
 reproduces the committed batches byte for byte, and the golden ingestion,
@@ -171,13 +194,13 @@ than a future commit hash.
   runner invocation per OS process. The Phase 1-3 JSONL store is unchanged; a
   torn line there is still a hard stop.
 - M3 revenue comes from synthetic flat monthly plans, not real contracts; it
-  has no proration, discounts, taxes or credits. No app (M5) and no hosted
+  has no proration, discounts, taxes or credits. No hosted
   deployment (M6) yet.
 - No CI, and no license file yet.
 
 ## Stack
 
-Python 3.13, DuckDB, Streamlit (from M5), plain JSON inputs.
+Python 3.13, DuckDB, Streamlit, plain JSON inputs.
 Development happens on Windows; the commands below are PowerShell.
 
 | Direct dependency | Pin      | Why it is pinned                                                      |
@@ -233,6 +256,16 @@ generated `expected\` subfolder is never ingested. Costing `--out` must be a
 fresh directory that does not exist yet, so runs never overwrite earlier
 outputs.
 
+The local app serves the reviewed export committed under `app\export\`, so no
+pipeline run is needed first. From the repo root, after the install step above:
+
+```powershell
+.venv\Scripts\python.exe -m streamlit run app\streamlit_app.py
+```
+
+Open the local URL that Streamlit prints. The app adds `src` to its own import
+path, so `PYTHONPATH` is not needed for it.
+
 ## Repository layout
 
 ```text
@@ -241,9 +274,11 @@ ai-cost-margin-pipeline/
   fixtures/phase1/      synthetic ingestion batches and frozen expected outputs
   fixtures/phase2/      synthetic price list, invalid cases, expected outputs
   fixtures/phase3/      simulated plans, late/correction batches, golden margins
+  app/                  Streamlit app, scenario engine and verified export loader
+  app/export/           committed sanitized export the app serves (8 files)
   src/ai_cost_margin/   shared pipeline package
   tests/                pytest suite
-  tools/                independent hand-calculation checks
+  tools/                independent hand-calculation checks and the kill drill
   var/                  private working state, gitignored
   build.md              append-only record of progress and evidence
 ```

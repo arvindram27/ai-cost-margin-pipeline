@@ -133,3 +133,18 @@ Rules:
 - State after this entry: committed at 64fe19d964ac2a113d834ed86b073bda15a68cc5; independent review pending
 - Blockers: none
 - Next step: Phase 5 planning (M5: local Streamlit app) in Plan mode.
+
+### Entry 6 - 2026-11-08 (Phase 5 closeout record)
+
+- Phase: 5 - Interactive app, local (M5)
+- Tool/model: OpenCode (model not recorded)
+- Verified base (last commit verified by review): b02922e8beb15989c88fd21db78f7b3406cba5d7 (after the push, the public commit, its parent 9ae359543c2cb4b4b510583ed3b0e463366d51b3 and its two test blobs were independently checked against the reviewed bytes; the app, scenario and export files were byte-reviewed before their commits; this is an identity and bytes check, not a full closeout review of Phase 5)
+- HEAD at work start (may include unverified commits; a dirty mid-phase HEAD is not a verified base): 06dcc8d59cff36be3b2ac08612fa6b042a3c7b51 at phase start (the Phase 4 log commit); b02922e8beb15989c88fd21db78f7b3406cba5d7 at the start of this documentation entry
+- What changed: C1 added the export generator and the reviewed eight-file dataset under app/export/ (two distinct digests, surrogate evt-NNNN event keys). C2 added the review app and the verified export loader. C3 added the what-if scenarios, recomputed through the same engine, and the provenance panel. C4 added 12 persistent tests: 5 scenario-engine tests and 7 app and loader tests (6 AppTest page tests, including two-session isolation and the app's refusal of a tampered export, plus 1 direct test that the export loader refuses a tampered copy). Several gated steps stopped on instruction or harness defects and were reported and corrected under scoped continuations before the affected commits.
+- Tests run (command -> short result summary): all results are author-reported; the independent review did not rerun them on the user's PC. venv `python -m pytest` -> 332 collected, 331 passed, 1 skipped (the explicit golden-generation check) on the user's Windows PC. In one Linux reviewer environment the 12 new tests passed and one existing test, tests/test_run_store.py::test_lock_real_second_writer_process_is_busy, failed; it passed on the user's PC. This is recorded as an observed baseline, not investigated and not changed here.
+- Provenance/data notes (which fixtures or inputs were touched): synthetic fixtures only; the committed export is sanitized (surrogate event keys, no raw provider event IDs, account IDs, request IDs, provider attempt IDs or payload hashes); working stores stay under var/ and are gitignored; no screenshots or other image files are committed for Phase 5.
+- Commits produced (hashes pasted from `git log`): 8424f0f9808e4b5b617b3a00701d0966efabbb5a (P5-C1: export generator, tests and reviewed export dataset), e30bf35489b3c116de2a7b7b812c6c494e365320 (P5-C2: export review app and verified bundle loader), 9ae359543c2cb4b4b510583ed3b0e463366d51b3 (P5-C3: what-if scenarios and provenance sections), b02922e8beb15989c88fd21db78f7b3406cba5d7 (P5-C4: tests for what-if scenarios and provenance)
+- Log commit (hash of the commit that added the PREVIOUS entry): 06dcc8d59cff36be3b2ac08612fa6b042a3c7b51 (the commit carrying Entry 5)
+- State after this entry: pushed - awaiting review (this refers to the four published Phase 5 commits C1 to C4; this entry and the matching README update are not yet committed, and the commit that carries them is recorded in the next entry's Log commit field)
+- Blockers: none
+- Next step: CI verification, then Phase 6 planning (M6: hosted deployment, audience decision and hosting terms first) in Plan mode. The license choice and screenshot publishing are optional separate user decisions and do not block either.
