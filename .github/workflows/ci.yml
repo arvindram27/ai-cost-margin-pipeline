@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: pytest (windows, Python 3.13)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Create the virtual environment and install the pinned dependencies
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { throw 'virtual environment creation failed' }
+          .venv\Scripts\python.exe -m pip install --only-binary :all: -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'dependency install failed' }
+
+      - name: Run the test suite
+        shell: pwsh
+        run: |
+          .venv\Scripts\python.exe -m pytest
+          if ($LASTEXITCODE -ne 0) { throw 'pytest failed' }
