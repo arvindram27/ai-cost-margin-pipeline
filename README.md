@@ -4,186 +4,128 @@ A local, deterministic data pipeline working toward one question per customer:
 *what did this usage cost to serve, what did the customer pay, and is the price
 sustainable?*
 
-Today it builds the answer through M5: raw AI usage events are validated,
-deduplicated and costed against a versioned synthetic price list, then
-aggregated into per-customer and per-workload-type simulated revenue and margin
-tables, and a local Streamlit app shows a sanitized export of those tables.
-Every stage is auditable and money-exact. Everything runs on synthetic
-fixtures; no real customer data has ever been ingested.
+Raw AI usage events are validated, deduplicated and costed against a versioned
+synthetic price list, then aggregated into per-customer and per-workload-type
+simulated revenue and margin tables. A Streamlit app shows a sanitized export of
+those tables. Every stage is auditable and money-exact. Everything runs on
+synthetic fixtures; no real customer data has ever been ingested.
 
 **Status:** milestones M1 (ingestion), M2 (pricing and costing), M3
 (aggregation and simulated margins), M4 (determinism and recovery) and M5
-(the local app) are built and tested. The hosted demo (M6) is planned and
-approval-gated.
+(the local app) are built and tested. M6 is built: the hosted demo is live at
+https://ai-cost-margin-pipeline.streamlit.app/ (Streamlit Community Cloud, free
+tier). Optional extensions (M7, M8) are not built.
 
 The target is a **production-oriented demo**, not a production-validated
 system: there is no multi-user access control, no security review, no SLA and
 no real multi-tenant deployment. Any later reliability or reproducibility
 claim will be tied to a proof run that demonstrates it.
 
-## Why this exists
+## Demo
 
-An AI product that cannot say which users, features and models drive its cost
-cannot price itself. This pipeline builds the trustworthy cost side of that
-equation first: every event is validated, deduplicated and costed against a
-versioned price list, with explicit outcomes instead of silent drops. Revenue
-and margin layers sit on top of that foundation (M3), labelled so it is always
-clear where a number came from.
+Live demo: https://ai-cost-margin-pipeline.streamlit.app/ (synthetic data only;
+reporting period 2026-10). The screenshots below are from the hosted app.
 
-## Milestones
+![Customers page: estimated cost, simulated revenue and margin per customer](docs/screenshots/customers.png)
 
-| Milestone | Scope                                                                | State                    |
-| --------- | -------------------------------------------------------------------- | ------------------------ |
-| M1        | Ingestion foundation: validation, dedup, quarantine, append-only store | Built and tested       |
-| M2        | Pricing: exact money, price series and intervals, costing engine     | Built and tested         |
-| M3        | Aggregation and margins per customer and workload type (simulated)   | Built and tested         |
-| M4        | Determinism and recovery: DuckDB store, atomic publish, checkpoints  | Built and tested         |
-| M5        | Local Streamlit app                                                  | Built and tested         |
-| M6        | Hosted demo deployment                                               | Planned, approval-gated  |
-| M7, M8    | Optional extensions                                                  | Optional                 |
+*Customers: cost, revenue and margin per customer, with incomplete margins marked.*
 
-## Architecture
+![What-if scenarios page with Volume scale set to 160 percent](docs/screenshots/what-if-scenarios.png)
+
+*What-if scenarios, with Volume scale set to 160%: costs are recomputed in memory; revenue stays fixed.*
+
+![Workload breakdown page: cost by workload type and customer, plus the unallocated bucket](docs/screenshots/workload-breakdown.png)
+
+*Workload breakdown: where the cost comes from, including usage that has no customer.*
+
+## Sample output (synthetic data)
+
+One input event from `fixtures/phase1/batch-001-clean.json` (selected fields):
+
+```json
+{"provider_event_id": "evt-001-001", "customer_id": "cust-001", "model": "synth-small", "workload_type": "short_light", "usage_time": "2026-10-01T08:00:00Z", "tokens_input": 4825, "tokens_output": 1403, "tokens_cached": 194}
+```
+
+Its costed result from `fixtures/phase2/expected/costed-events.jsonl` (selected fields):
+
+```json
+{"provider_event_id": "evt-001-001", "cost_status": "costed", "cost_label": "estimated", "price_version_input": "synthetic-prices-v1/synth-small/2026-10-01", "total_cost": "0.006659100000"}
+```
+
+A customer margin row from `app/export/customer-margins.jsonl` (selected fields):
+
+```json
+{"customer_id": "cust-001", "period": "2026-10", "plan_id": "starter", "simulated_revenue": "49.000000000000", "estimated_cost": "0.026507850000", "simulated_margin": "48.973492150000", "margin_status": "complete", "events_costed": 4, "revenue_label": "simulated", "cost_label": "estimated"}
+```
+
+The margin row aggregates every current event for that customer and period
+(`events_costed` shows the count); the single event above does not produce it.
+See [the margin contract](docs/phase-3-margin-contract.md). All values are
+copied from committed files.
+
+## How it works
 
 ![Architecture](docs/diagrams/architecture.png)
 
 Editable source: [docs/diagrams/architecture.excalidraw](docs/diagrams/architecture.excalidraw)
 (open at [excalidraw.com](https://excalidraw.com)).
 
-- **Ingestion (M1).** Each delivered batch is hashed (SHA-256) and copied
-  atomically into `raw/`, then validated at two levels: the batch envelope and
-  every event it carries. Events are deduplicated on their
-  `(provider, account, provider_event_id)` key: an identical payload is a
-  duplicate and is skipped; a changed payload is accepted only with a strictly
-  higher `record_version`, otherwise it is quarantined.
-- **Append-only store.** The Phase 1 ingest CLI lands validated events in
-  `var/state/events.jsonl` alongside a manifest, a dead-letter file, a
-  quarantine file and a per-run ingestion report. The Phase 4 runner
-  (`python -m ai_cost_margin.pipeline`) does the whole run in one command
-  against a private DuckDB working store (`var/pipeline.duckdb`): each stage
-  commits its checkpoint atomically, an interrupted attempt resumes from its
-  last verified checkpoint, and the seven result files publish atomically
-  under the run fingerprint. `var/` is private and gitignored.
-- **Pricing (M2).** The price list is validated before any event is costed:
-  one series per `(provider, model, unit)` - unit is input, output or cached -
-  built from half-open `[from,to)` intervals that must be contiguous and
-  non-overlapping, with an open-ended interval allowed only as the last in a
-  series. Duplicate price version ids or duplicate interval starts are
-  rejected, the list carries a single currency, and its label must be
-  `synthetic`. An invalid schedule is fatal: costing never starts.
-- **Costing engine (M2).** Each event is priced by its `usage_time` against
-  the matching interval of its `(provider, model)` series. Supersession is
-  resolved by `record_version` and by `supersedes` references: superseded
-  records are never charged, and ambiguous lineage stops the run instead of
-  guessing. Costs are computed in exact integer arithmetic.
-- **Outputs.** A fresh output directory per run: `costed-events.jsonl` (each
-  row labelled costed, superseded or unpriced; amounts are null when
-  unpriced) and `costing-report.json` (counts, totals, unpriced reasons,
-  `cost_label: "estimated"`, `price_list_label: "synthetic"`).
-- **Sanitized export (M5).** The export generator (`python -m ai_cost_margin.export`)
-  turns one verified published run into eight committed files under
-  `app/export/`: the margin tables, sanitized scenario events and lineage with
-  surrogate `evt-NNNN` keys (no raw provider event IDs, account IDs, request IDs,
-  provider attempt IDs or payload hashes), the synthetic price list, the
-  simulated plans, and an export manifest. Before it writes anything it binds
-  the published run files to the store's stage rows through six consistency
-  checks, and it records two distinct digests: the attested source financial
-  digest and an integrity digest over the export bytes.
-- **Local app (M5).** The Streamlit app (`app/streamlit_app.py`) reads the
-  committed export read-only and verifies it on load. It has four sections:
-  customers, workload breakdown, what-if scenarios and provenance. What-if
-  scenarios are recomputed in memory through the same pricing, costing,
-  allocation and aggregation code as the pipeline. Scenario choices live only in
-  the browser session, and the app code does not write scenario results to disk.
-
-## Workflow
+- **Ingest (M1).** Batches are hashed, copied into `raw/`, validated and
+  deduplicated by event key and `record_version`. Failures go to a dead-letter
+  or quarantine file, never silently dropped.
+  See [the ingestion contract](docs/phase-1-ingestion-contract.md).
+- **Price and cost (M2).** The price list is validated first, then each event is
+  priced by `usage_time` in exact integer arithmetic; events that cannot be
+  priced are marked unpriced with a reason.
+  See [the pricing contract](docs/phase-2-pricing-contract.md).
+- **Aggregate (M3).** Costed rows are summed per customer-month and per workload
+  type; simulated flat plan revenue is allocated by token volume, and usage with
+  no customer stays in an unallocated bucket.
+  See [the margin contract](docs/phase-3-margin-contract.md).
+- **Run and recover (M4).** One command (`python -m ai_cost_margin.pipeline`)
+  runs every stage against a private DuckDB store with atomic checkpoints. An
+  interrupted run resumes and reaches byte-identical results.
+  See [the determinism contract](docs/phase-4-determinism-contract.md).
+- **Export and app (M5, M6).** `python -m ai_cost_margin.export` turns one
+  verified run into eight sanitized files under `app/export/`. The Streamlit app
+  reads them read-only and verifies them on load. It has four pages: customers,
+  workload breakdown, what-if scenarios (recomputed in memory with the pipeline's
+  own pricing and aggregation code) and provenance. The hosted demo serves the
+  same committed export.
 
 ![Workflow](docs/diagrams/workflow.png)
 
 Editable source: [docs/diagrams/workflow.excalidraw](docs/diagrams/workflow.excalidraw).
-
-Note: both diagrams were last updated at M4 and do not show the M5 app. The
-numbered steps below are current.
-
-1. A batch arrives as one JSON file: an envelope plus its events.
-2. The batch content is hashed (SHA-256) and copied atomically into `raw/`.
-3. The envelope is validated; failures go to `dead-letter.jsonl`.
-4. Each event is validated; failures go to `dead-letter.jsonl` with the event
-   index and reason.
-5. Events are deduplicated and version-checked on their event key: an
-   identical payload is a duplicate; a changed payload with a strictly higher
-   `record_version` is inserted; the same or a lower version is quarantined.
-6. The price list is validated: contiguous, non-overlapping `[from,to)`
-   series per `(provider, model, unit)`. An invalid schedule stops the run
-   before any event is read.
-7. Supersession is resolved: records replaced by a higher `record_version` or
-   named in another record's `supersedes` are marked superseded and never
-   charged; ambiguous lineage stops the run.
-8. Each remaining event is priced by its `usage_time`, with separate rates
-   for input, output and cached tokens.
-9. Cost is computed exactly as integer 10^-12 currency units, serialized with
-   twelve decimal places, never floats. An event with no applicable rate (or
-   unusable token counts) is unpriced with a named reason.
-10. Outputs are written to a fresh directory: `costed-events.jsonl` and
-    `costing-report.json`.
-11. (M3) An as-of cutoff selects stored records by `arrival_time`; the two
-    supersession rules produce directed lineage edges. Costed rows aggregate to
-    one row per customer-month and one per customer-month-workload-type.
-    Simulated flat monthly plan revenue is allocated by billable token volume,
-    with unpriced usage marking the month incomplete and unattributable usage
-    kept in an unallocated bucket. A digest covers the financial tables only.
-12. (M4) One command runs the whole pipeline: raw, validated, costed,
-    aggregated, publish. Each stage writes its rows and checkpoint in one
-    transaction, so a killed process leaves no partial committed stage: raw copies stay inert until their stage commits. The next
-    identical invocation adopts the interrupted attempt's verified prefix and
-    recomputes the rest; the seven files and the digest are identical either
-    way. Publishing is an atomic rename after every file exists; an exact
-    byte-for-byte rerun is reported as a replay, never rewritten. The
-    single-writer guarantee is cross-process.
-13. (M5) The verified published run is exported to the sanitized dataset under
-    `app/export/`, and a local Streamlit app serves it read-only: customers,
-    workload breakdown, what-if scenarios recomputed through the same engine,
-    and a provenance panel showing the source digest, the recomputed digest and
-    whether they match. The hosted demo (M6) is still planned and
-    approval-gated.
-
-Every outcome is explicit: duplicate, dead-lettered, quarantined, superseded,
-unpriced - nothing is silently dropped.
+Every outcome is explicit (duplicate, dead-lettered, quarantined, superseded,
+unpriced). The step-by-step rules are in the phase contracts linked under
+[Documentation](#documentation).
 
 ## Money and labelling rules
 
-- Money is exact: amounts are integer counts of 10^-12 currency units,
-  serialized as strings with exactly twelve decimal places. Floats are
-  rejected by construction.
-- Rates are six-decimal strings (for example `"0.750000"` per 1,000,000
-  tokens) converted to integer micro numerators, so no decimal rounding
-  context is ever involved in a price.
-- Cached tokens are treated as a subset of input tokens billed at the cached
-  rate - a synthetic assumption (S1), not a claim about any real provider.
-  A cached count above the input count makes the event unpriced.
-- Labels in outputs today: costed rows and reports carry
-  `cost_label: "estimated"`; the price list and its selection carry
-  `label: "synthetic"` / `price_list_label: "synthetic"`. Costs are estimates
-  from a synthetic price list, never billed amounts. Planned revenue and
-  margin layers follow the same discipline: simulated revenue will be
-  labelled simulated.
-- Usage data is synthetic by default. This repository contains no real
-  customer data, no real prompts and no real revenue.
-- `var/` - the raw event store, run history, manifests and working files -
-  stays private and gitignored. Only reviewed, sanitized exports are
-  committed.
-- No secrets in the repo: no `.env` file, no API keys, no private account
-  identifiers. Provider and model names in the fixtures are openly synthetic
-  (`synthetic-token-provider`, `synth-small`, `synth-large`).
+- Money is exact: integer counts of 10^-12 currency units, serialized as strings
+  with twelve decimal places. Floats are rejected by construction.
+- Cached tokens are a subset of input tokens billed at the cached rate - a
+  synthetic assumption, not a claim about any real provider.
+- Costs are labelled `estimated` and come from a `synthetic` price list, never
+  billed amounts. Revenue and margin are labelled `simulated`; usage is
+  `synthetic`.
+- The repository contains no real customer data, prompts, revenue or secrets.
+  `var/` (raw store, run history, working files) is private and gitignored; only
+  reviewed, sanitized exports are committed.
 
 ## Determinism and testing
 
-332 tests collected under pytest (331 passed, 1 skipped - the explicit golden-generation check). The Phase 5 tests cover the scenario engine against hand-calculated values, the app pages through Streamlit AppTest (including isolation between two simulated sessions and the app's refusal of a tampered export), and a direct test that the export loader refuses a tampered copy. Phase 4 adds a three-point kill drill (`tools/kill_drill.py`): runs killed before the raw commit, before the costed commit and after the publish rename each resume to byte-identical results, and the published pointer never names a staged attempt. Ingestion reads no wall clock: `arrival_time` comes
-from the batch envelope and the ingest id is content-addressed. Golden
-fixtures pin the behavior the suite covers: the Phase 1 fixture generator
-reproduces the committed batches byte for byte, and the golden ingestion,
-golden costing and golden margin checks reproduce their frozen expected outputs
-byte for byte. Phase 3 goldens carry a fixed fixture code-version label rather
-than a future commit hash.
+On the author's Windows machine, 332 tests are collected under pytest (331
+passed, 1 skipped - the explicit golden-generation check). They cover the
+scenario engine against hand-calculated values, the app pages through Streamlit
+AppTest, and the refusal of a tampered export. A three-point kill drill
+(`tools/kill_drill.py`) kills runs at three stages; each resumes to
+byte-identical results. Golden fixtures pin the ingestion, costing and margin
+outputs byte for byte.
+
+CI: one GitHub Actions workflow (`.github/workflows/ci.yml`) runs the test suite
+on Windows with Python 3.13; its first run, on commit 2a22410, completed
+successfully. Other platforms are not covered by CI.
 
 ## Honest limitations
 
@@ -194,23 +136,17 @@ than a future commit hash.
   runner invocation per OS process. The Phase 1-3 JSONL store is unchanged; a
   torn line there is still a hard stop.
 - M3 revenue comes from synthetic flat monthly plans, not real contracts; it
-  has no proration, discounts, taxes or credits. No hosted
-  deployment (M6) yet.
-- No CI, and no license file yet.
+  has no proration, discounts, taxes or credits.
+- The hosted demo runs on the Streamlit Community Cloud free tier over the same
+  committed export. It is a read-only public demo, not a production service,
+  and its availability is whatever the free tier provides.
+- No license file yet.
 
 ## Stack
 
-Python 3.13, DuckDB, Streamlit, plain JSON inputs.
+Python 3.13, DuckDB 2.0.0, Streamlit 1.67.0, pytest 9.2.0 (the three direct
+dependencies are pinned in `requirements.txt`; pip resolves the rest).
 Development happens on Windows; the commands below are PowerShell.
-
-| Direct dependency | Pin      | Why it is pinned                                                      |
-| ----------------- | -------- | --------------------------------------------------------------------- |
-| `streamlit`       | 1.67.0   | Hosting can auto-upgrade unpinned apps; the pin keeps the demo reproducible |
-| `duckdb`          | 2.0.0    | Single-writer analytical store for the local pipeline                 |
-| `pytest`          | 9.2.0    | Test runner                                                           |
-
-`requirements.txt` pins the three direct dependencies only; pip resolves
-their transitive dependencies at install time.
 
 ## Running it
 
@@ -222,14 +158,10 @@ py -3.13 -m venv .venv
 .venv\Scripts\python.exe -m pytest
 ```
 
-Notes:
-
-- Call `.venv\Scripts\python.exe` directly instead of running `Activate.ps1`,
-  so the PowerShell Execution Policy cannot get in the way.
-- Do not run `pip install --upgrade pip`: the bundled pip is enough, and
-  upgrading would install an unpinned package.
-- `--only-binary :all:` fails fast when a wheel is missing instead of
-  building from source.
+Notes: call `.venv\Scripts\python.exe` directly so the PowerShell Execution
+Policy cannot get in the way; do not run `pip install --upgrade pip` (it would
+install an unpinned package); `--only-binary :all:` fails fast when a wheel is
+missing instead of building from source.
 
 The package uses a `src/` layout, so module commands need `src` on
 `PYTHONPATH` (`pytest.ini` sets that for pytest only). A full demo run, using
@@ -264,23 +196,22 @@ pipeline run is needed first. From the repo root, after the install step above:
 ```
 
 Open the local URL that Streamlit prints. The app adds `src` to its own import
-path, so `PYTHONPATH` is not needed for it.
+path, so `PYTHONPATH` is not needed for it. The hosted demo serves the same
+export: https://ai-cost-margin-pipeline.streamlit.app/
 
 ## Repository layout
 
 ```text
-ai-cost-margin-pipeline/
-  docs/                 brief, roadmap, phase contracts, diagrams
-  fixtures/phase1/      synthetic ingestion batches and frozen expected outputs
-  fixtures/phase2/      synthetic price list, invalid cases, expected outputs
-  fixtures/phase3/      simulated plans, late/correction batches, golden margins
-  app/                  Streamlit app, scenario engine and verified export loader
-  app/export/           committed sanitized export the app serves (8 files)
-  src/ai_cost_margin/   shared pipeline package
-  tests/                pytest suite
-  tools/                independent hand-calculation checks and the kill drill
-  var/                  private working state, gitignored
-  build.md              append-only record of progress and evidence
+.github/              GitHub Actions workflow (CI)
+docs/                 brief, roadmap, phase contracts, diagrams, screenshots
+fixtures/             synthetic batches, price list, plans and frozen outputs
+app/                  Streamlit app, scenario engine, verified export loader
+app/export/           committed sanitized export the app serves (8 files)
+src/ai_cost_margin/   shared pipeline package
+tests/                pytest suite
+tools/                hand-calculation checks and the kill drill
+var/                  private working state, gitignored
+build.md              append-only record of progress and evidence
 ```
 
 ## Documentation
