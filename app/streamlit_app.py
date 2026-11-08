@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import streamlit as st
 
 import export_data
+import scenarios
+from ai_cost_margin import aggregate, costing, pricing, revenue
 from ai_cost_margin.revenue import workload_sort_key
 
 MONEY_COLUMNS = ("estimated_cost", "simulated_revenue", "simulated_margin")
@@ -199,6 +201,231 @@ def _workload_page(bundle) -> None:
     st.caption("The unallocated bucket carries no revenue or margin by design.")
 
 
+def _reset_scenario() -> None:
+    for key in [key for key in st.session_state if key.startswith("scenario_")]:
+        del st.session_state[key]
+
+
+def _models(bundle) -> list[str]:
+    return sorted({entry["model"] for entry in bundle.price_list["entries"]})
+
+
+def _first_rates(bundle, model: str):
+    entries = [
+        entry for entry in bundle.price_list["entries"] if entry["model"] == model
+    ]
+    first = sorted(entries, key=lambda entry: entry["effective_from"])[0]
+    return first["rates_per_million"]
+
+
+def _render_scenario_tables(customer_rows, workload_rows, unallocated_rows) -> None:
+    customer = sorted(
+        customer_rows, key=lambda row: (row["period"], row["customer_id"])
+    )
+    _dataframe(_display_rows(customer, MONEY_COLUMNS), MONEY_COLUMNS, CUSTOMER_COLUMNS)
+    workload = sorted(
+        workload_rows,
+        key=lambda row: (
+            workload_sort_key(row["workload_type"]),
+            row["customer_id"],
+            row["period"],
+        ),
+    )
+    _dataframe(_display_rows(workload, MONEY_COLUMNS), MONEY_COLUMNS, WORKLOAD_COLUMNS)
+    _dataframe(
+        _display_rows(unallocated_rows, ("estimated_cost",)),
+        ("estimated_cost",),
+        UNALLOCATED_COLUMNS,
+    )
+
+
+def _scenario_page(bundle) -> None:
+    st.subheader("What-if scenarios")
+    st.caption(
+        "What-if figures recomputed in memory from the committed synthetic "
+        "export; nothing is saved. Workload is held constant and no "
+        "output-quality claim is made when a model is substituted."
+    )
+    models = _models(bundle)
+    volume = st.slider(
+        "Volume scale (%)",
+        min_value=10,
+        max_value=300,
+        step=10,
+        value=100,
+        key="scenario_volume",
+    )
+    flat_rates = []
+    substitutions = []
+    for model in models:
+        mode = st.radio(
+            f"{model} rates",
+            ["Keep original rates", "Set flat rates"],
+            key=f"scenario_ratemode_{model}",
+        )
+        if mode == "Set flat rates":
+            defaults = _first_rates(bundle, model)
+            rates = tuple(
+                st.text_input(
+                    f"{model} {unit} rate (per million)",
+                    value=defaults[unit],
+                    key=f"scenario_rate_{model}_{unit}",
+                )
+                for unit in ("input", "output", "cached")
+            )
+            flat_rates.append((model, *rates))
+        choice = st.selectbox(
+            f"{model} substitution",
+            ["original"] + models,
+            key=f"scenario_sub_{model}",
+        )
+        if choice != "original":
+            substitutions.append((model, choice))
+    st.button("Reset scenario", on_click=_reset_scenario)
+
+    levers = scenarios.ScenarioLevers(
+        volume_tenths=volume // 10,
+        flat_rates=tuple(flat_rates),
+        substitutions=tuple(substitutions),
+    )
+    lever_lines = [f"Volume scale {volume}%."]
+    for model, input_rate, output_rate, cached_rate in flat_rates:
+        lever_lines.append(
+            f"{model} rates overridden flat at input {input_rate}, output "
+            f"{output_rate}, cached {cached_rate} per million (original price "
+            "version ids retained with overridden rates)."
+        )
+    for model, replacement in substitutions:
+        lever_lines.append(
+            f"{model} events priced as {replacement} (workload held constant; "
+            "no output-quality claim)."
+        )
+
+    try:
+        result = scenarios.compute_scenario(bundle, levers)
+    except (
+        ValueError,
+        pricing.PriceScheduleError,
+        revenue.PlanScheduleError,
+        aggregate.UnknownPlanError,
+        aggregate.CompositionError,
+        costing.LineageAmbiguityError,
+    ) as exc:
+        st.error(
+            "Scenario invalid; showing the published baseline, "
+            f"overrides not applied: {exc}"
+        )
+        st.info(
+            "The levers below were NOT applied; the tables show the verified "
+            "published baseline. Attempted levers: " + " ".join(lever_lines)
+        )
+        _render_scenario_tables(
+            bundle.customer_margins, bundle.workload_margins, bundle.unallocated
+        )
+        st.write(
+            "Published baseline digest (attested in the export manifest): "
+            f"{bundle.manifest['source']['digest']}"
+        )
+        return
+
+    if volume == 100 and not flat_rates and not substitutions:
+        st.info("Scenario equals the published baseline (no levers applied).")
+    else:
+        st.info("Active levers: " + " ".join(lever_lines))
+    _render_scenario_tables(
+        result.customer_rows, result.workload_rows, result.unallocated_rows
+    )
+    report = result.report
+    reasons = report["unpriced_by_reason"].as_dict()
+    reason_text = ", ".join(f"{name}={reasons[name]}" for name in sorted(reasons))
+    st.write(
+        f"Costed: {report['events_costed']} | Unpriced: {report['events_unpriced']} "
+        f"| Superseded: {report['events_superseded']} | "
+        f"Unpriced reasons: {reason_text}"
+    )
+    st.write(
+        "Scenario digest (recomputed for these what-if inputs; "
+        f"not the published digest): {result.digest}"
+    )
+
+
+def _provenance_page(bundle) -> None:
+    st.subheader("Provenance")
+    manifest = bundle.manifest
+    source = manifest["source"]
+    labels = manifest["labels"]
+    st.write(f"Run fingerprint: {source['run_fingerprint']}")
+    st.write(f"Artifact directory: {source['artifact_dir']}")
+    st.write(f"As-of cutoff: {source['as_of_cutoff']}")
+    st.write(
+        f"Code version: {source['code_version']} "
+        f"({source['code_version_source']}, "
+        f"working tree clean: {source['working_tree_clean']})"
+    )
+    st.write(f"Store events digest: {source['store_events_sha256']}")
+    st.write(f"Store: {source['store_backend']} / {source['store_locator']}")
+    st.write(
+        f"Price list: {source['price_list_id']} (sha256 {source['price_list_sha256']})"
+    )
+    st.write(f"Plans: {source['plans_version_id']} (sha256 {source['plans_sha256']})")
+    st.write(
+        f"Events in store: {source['events_in_store']} | included: "
+        f"{source['events_included']} | excluded by cutoff: "
+        f"{source['events_excluded_by_cutoff']}"
+    )
+    st.write(
+        f"Costed: {source['events_costed']} | Unpriced: {source['events_unpriced']} "
+        f"| Superseded: {source['events_superseded']}"
+    )
+    reasons = source["unpriced_by_reason"].as_dict()
+    reason_text = ", ".join(f"{name}={reasons[name]}" for name in sorted(reasons))
+    st.write(f"Unpriced by reason: {reason_text}")
+    st.write(f"Dangling supersedes: {source['dangling_supersedes']}")
+    st.write(
+        f"Unallocated shares (bp): cost {source['unallocated_cost_share_bp']}, "
+        f"events {source['unallocated_event_share_bp']}"
+    )
+    st.write(
+        "Ingest counters (published-attempt ingest counters, not the "
+        f"fixture-corpus totals): dead_lettered={source['dead_lettered']}, "
+        f"quarantined={source['quarantined']}, duplicates={source['duplicates']}"
+    )
+    st.write(
+        f"Labels - usage: {labels['usage']}; cost: {labels['cost']}; "
+        f"revenue: {labels['revenue']}; margin: {labels['margin']}"
+    )
+    st.write(f"Export schema version: {manifest['export_schema_version']}")
+
+    file_rows = [
+        {"name": name, "rows": entry["rows"], "sha256": entry["sha256"]}
+        for name, entry in sorted(manifest["files"].items)
+    ]
+    st.dataframe(file_rows, hide_index=True)
+    if bundle.lineage:
+        _dataframe(
+            _display_rows(bundle.lineage, ()),
+            (),
+            bundle.lineage[0].keys(),
+        )
+
+    attested = source["digest"]
+    recomputed = bundle.financial_digest
+    st.write(f"Pipeline digest (attested in the export manifest): {attested}")
+    st.write(f"Digest recomputed by this app from the exported tables: {recomputed}")
+    if recomputed == attested:
+        st.success("MATCH")
+    else:
+        st.error("MISMATCH - do not trust this export")
+    st.write(
+        "Export integrity digest (recomputed over the export bytes): "
+        f"{bundle.integrity_digest}"
+    )
+    st.caption(
+        f"Digest definitions: {source['digest_definition']} | "
+        f"{manifest['export_integrity_definition']}"
+    )
+
+
 def main() -> None:
     st.set_page_config(page_title="AI Cost & Margin Pipeline", layout="wide")
     try:
@@ -212,11 +439,18 @@ def main() -> None:
     st.title("AI Cost & Margin Pipeline - Export Review")
     st.caption(_labels_caption(bundle))
 
-    section = st.sidebar.radio("Section", ["Customers", "Workload breakdown"])
+    section = st.sidebar.radio(
+        "Section",
+        ["Customers", "Workload breakdown", "What-if scenarios", "Provenance"],
+    )
     if section == "Customers":
         _customers_page(bundle)
-    else:
+    elif section == "Workload breakdown":
         _workload_page(bundle)
+    elif section == "What-if scenarios":
+        _scenario_page(bundle)
+    else:
+        _provenance_page(bundle)
 
 
 if __name__ == "__main__":
